@@ -85,7 +85,6 @@ public class SolrTable extends AbstractTable implements QueryableTable, Translat
       case "string":
         return typeFactory.createJavaType(String.class);
       case "int":
-        return typeFactory.createJavaType(Integer.class);
       case "long":
         return typeFactory.createJavaType(Long.class);
       default:
