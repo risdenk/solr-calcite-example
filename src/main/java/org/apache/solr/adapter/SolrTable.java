@@ -66,17 +66,31 @@ public class SolrTable extends AbstractTable implements QueryableTable, Translat
   public RelDataType getRowType(RelDataTypeFactory typeFactory) {
     RelDataTypeFactory.FieldInfoBuilder builder = typeFactory.builder();
     for(Map.Entry<String, LukeResponse.FieldInfo> entry : this.fieldInfo.entrySet()) {
-      EnumSet<FieldFlag> flags = entry.getValue().getFlags();
-      RelDataType type;
+      LukeResponse.FieldInfo fieldInfo = entry.getValue();
+
+      RelDataType type = getRelDataType(typeFactory, fieldInfo.getType());
+
+      EnumSet<FieldFlag> flags = fieldInfo.getFlags();
       if(flags != null && flags.contains(FieldFlag.MULTI_VALUED)) {
-        type = typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.ANY), -1);
-      } else {
-        type = typeFactory.createSqlType(SqlTypeName.ANY);
+        type = typeFactory.createArrayType(type, -1);
       }
       builder.add(entry.getKey(), type);
     }
 
     return builder.build();
+  }
+
+  private RelDataType getRelDataType(RelDataTypeFactory typeFactory, String type) {
+    switch (type) {
+      case "string":
+        return typeFactory.createJavaType(String.class);
+      case "int":
+        return typeFactory.createJavaType(Integer.class);
+      case "long":
+        return typeFactory.createJavaType(Long.class);
+      default:
+        return typeFactory.createJavaType(Object.class);
+    }
   }
 
   public Enumerable<Object> project(final int[] fields) {

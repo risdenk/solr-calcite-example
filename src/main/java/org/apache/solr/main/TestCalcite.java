@@ -3,6 +3,8 @@ package org.apache.solr.main;
 import org.apache.solr.adapter.SolrSchemaFactory;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -37,7 +39,11 @@ public class TestCalcite {
                     ResultSetMetaData rsMetaData = rs.getMetaData();
                     while(rs.next()) {
                         for(int i = 1; i <= rsMetaData.getColumnCount(); i++) {
-                            System.out.println(rsMetaData.getColumnName(i) + " - " + rs.getString(i));
+                            List<Object> outputList = new ArrayList<>();
+                            outputList.add(rsMetaData.getColumnName(i));
+                            outputList.add(rsMetaData.getColumnTypeName(i));
+                            outputList.add(rs.getString(i));
+                            System.out.println(outputList);
                         }
                         System.out.println();
                     }

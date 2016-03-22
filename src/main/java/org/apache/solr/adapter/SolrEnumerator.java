@@ -1,12 +1,25 @@
+package org.apache.solr.adapter;
+
+import org.apache.calcite.linq4j.Enumerator;
+import org.apache.solr.client.solrj.io.Tuple;
+import org.apache.solr.client.solrj.io.stream.CloudSolrStream;
+import org.apache.solr.common.params.CommonParams;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to you under the Apache License, Version 2.0
+ * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,20 +27,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.adapter;
-
-import org.apache.calcite.linq4j.Enumerator;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.params.ModifiableSolrParams;
-
-import java.io.IOException;
-import java.util.*;
 
 class SolrEnumerator implements Enumerator<Object> {
-  private final Iterator<SolrDocument> resultIterator;
   private final List<String> selectedFields;
+  private final CloudSolrStream cloudSolrStream;
   private Object current;
 
   SolrEnumerator(SolrTable solrTable, int[] fields) {
@@ -37,12 +40,15 @@ class SolrEnumerator implements Enumerator<Object> {
     }
 
     try {
-      final ModifiableSolrParams solrParams = new ModifiableSolrParams();
-      solrParams.set("q", "*:*");
-      solrParams.set("fl", String.join(",", selectedFields));
-      QueryResponse queryResponse = solrTable.cloudSolrClient.query(solrTable.collection, solrParams);
-      this.resultIterator = queryResponse.getResults().iterator();
-    } catch (SolrServerException|IOException e) {
+      Map<String, String> solrParams = new HashMap<>();
+      solrParams.put(CommonParams.Q, "*:*");
+      solrParams.put(CommonParams.FL, String.join(",", selectedFields) + ",_version_");
+      solrParams.put(CommonParams.SORT, "_version_ desc");
+      //solrParams.put(CommonParams.QT, "/export");
+
+      cloudSolrStream = new CloudSolrStream(solrTable.cloudSolrClient.getZkHost(), solrTable.collection, solrParams);
+      cloudSolrStream.open();
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
@@ -53,8 +59,9 @@ class SolrEnumerator implements Enumerator<Object> {
 
   public boolean moveNext() {
     try {
-      if (resultIterator.hasNext()) {
-        current = this.converter(resultIterator.next());
+      Tuple tuple = cloudSolrStream.read();
+      if (!tuple.EOF) {
+        current = this.converter(tuple);
         return true;
       } else {
         current = null;
@@ -70,12 +77,17 @@ class SolrEnumerator implements Enumerator<Object> {
   }
 
   public void close() {
+    try {
+      cloudSolrStream.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
-  private Object converter(SolrDocument doc) {
+  private Object converter(Tuple tuple) {
     List<Object> row = new ArrayList<>(selectedFields.size());
     for(String field : selectedFields) {
-      Object o = doc.get(field);
+      Object o = tuple.get(field);
       if(o instanceof List) {
         row.add(((List)o).get(0));
       } else {
