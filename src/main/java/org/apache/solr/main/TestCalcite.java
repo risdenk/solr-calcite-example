@@ -14,7 +14,11 @@ public class TestCalcite {
         List<String> sqlQueries = new ArrayList<>();
         sqlQueries.add("select * from test");
         sqlQueries.add("select * from test limit 2");
+        sqlQueries.add("select fielda, fieldb, fieldc, fieldd_s, fielde_i from test");
+        sqlQueries.add("select fielda, fieldb, fieldc, fieldd_s, fielde_i from test limit 2");
         sqlQueries.add("select id, fielde_i, fieldd_s from test order by fielde_i desc");
+        sqlQueries.add("select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda, fieldb");
+        sqlQueries.add("select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb");
 
         Properties info = new Properties();
         info.setProperty("model",
@@ -56,6 +60,7 @@ public class TestCalcite {
                 for (int i = 1; i <= rsMetaData.getColumnCount(); i++) {
                     List<Object> outputList = new ArrayList<>();
                     outputList.add(rsMetaData.getColumnName(i));
+                    outputList.add(rsMetaData.getColumnLabel(i));
                     outputList.add(rsMetaData.getColumnTypeName(i));
                     outputList.add(rs.getString(i));
                     System.out.println(outputList);
