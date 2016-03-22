@@ -16,73 +16,60 @@
  */
 package org.apache.solr.adapter;
 
-import org.apache.calcite.adapter.enumerable.*;
-import org.apache.calcite.linq4j.tree.Blocks;
-import org.apache.calcite.linq4j.tree.Expressions;
-import org.apache.calcite.linq4j.tree.Primitive;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeField;
 
 import java.util.List;
 
-class SolrTableScan extends TableScan implements EnumerableRel {
-  final SolrTable solrTable;
-  private final int[] fields;
+/**
+ * Relational expression representing a scan of a Solr collection.
+ */
+class SolrTableScan extends TableScan implements SolrRel {
+  private final SolrTable solrTable;
+  private final RelDataType projectRowType;
 
-  SolrTableScan(RelOptCluster cluster, RelOptTable table, SolrTable solrTable, int[] fields) {
-    super(cluster, cluster.traitSetOf(EnumerableConvention.INSTANCE), table);
+  /**
+   * Creates a SolrTableScan.
+   *
+   * @param cluster        Cluster
+   * @param traitSet       Traits
+   * @param table          Table
+   * @param solrTable      Solr table
+   * @param projectRowType Fields and types to project; null to project raw row
+   */
+  SolrTableScan(RelOptCluster cluster, RelTraitSet traitSet, RelOptTable table, SolrTable solrTable,
+                RelDataType projectRowType) {
+    super(cluster, traitSet, table);
     this.solrTable = solrTable;
-    this.fields = fields;
+    this.projectRowType = projectRowType;
 
     assert solrTable != null;
+    assert getConvention() == SolrRel.CONVENTION;
   }
 
   @Override
   public RelNode copy(RelTraitSet traitSet, List<RelNode> inputs) {
     assert inputs.isEmpty();
-    return new SolrTableScan(getCluster(), table, solrTable, fields);
-  }
-
-  @Override
-  public RelWriter explainTerms(RelWriter pw) {
-    return super.explainTerms(pw).item("fields", Primitive.asList(fields));
+    return this;
   }
 
   @Override
   public RelDataType deriveRowType() {
-    final List<RelDataTypeField> fieldList = table.getRowType().getFieldList();
-    final RelDataTypeFactory.FieldInfoBuilder builder =
-            getCluster().getTypeFactory().builder();
-    for (int field : fields) {
-      builder.add(fieldList.get(field));
-    }
-    return builder.build();
+    return projectRowType != null ? projectRowType : super.deriveRowType();
   }
 
   @Override
   public void register(RelOptPlanner planner) {
-    planner.addRule(SolrProjectTableScanRule.INSTANCE);
+    planner.addRule(SolrToEnumerableConverterRule.INSTANCE);
+    for (RelOptRule rule : SolrRules.RULES) {
+      planner.addRule(rule);
+    }
   }
 
-  public Result implement(EnumerableRelImplementor implementor, Prefer pref) {
-    PhysType physType =
-        PhysTypeImpl.of(
-            implementor.getTypeFactory(),
-            getRowType(),
-            pref.preferArray());
-
-    return implementor.result(
-        physType,
-        Blocks.toBlock(
-            Expressions.call(table.getExpression(SolrTable.class),
-                "project", Expressions.constant(fields))));
+  public void implement(Implementor implementor) {
+    implementor.solrTable = solrTable;
+    implementor.table = table;
   }
 }

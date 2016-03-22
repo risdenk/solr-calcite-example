@@ -1,25 +1,12 @@
-package org.apache.solr.adapter;
-
-import org.apache.calcite.linq4j.Enumerator;
-import org.apache.solr.client.solrj.io.Tuple;
-import org.apache.solr.client.solrj.io.stream.CloudSolrStream;
-import org.apache.solr.common.params.CommonParams;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
+ * The ASF licenses this file to you under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,48 +14,80 @@ import java.util.Map;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.solr.adapter;
 
+import org.apache.calcite.linq4j.Enumerator;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.rel.type.RelProtoDataType;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.solr.client.solrj.io.Tuple;
+import org.apache.solr.client.solrj.io.stream.TupleStream;
+
+import java.io.IOException;
+import java.util.List;
+
+/** Enumerator that reads from a Solr collection. */
 class SolrEnumerator implements Enumerator<Object> {
-  private final List<String> selectedFields;
-  private final CloudSolrStream cloudSolrStream;
-  private Object current;
+  private final TupleStream tupleStream;
+  private Tuple current;
+  private List<RelDataTypeField> fieldTypes;
 
-  SolrEnumerator(SolrTable solrTable, int[] fields) {
-    selectedFields = new ArrayList<>(fields.length);
-    for (int field : fields) {
-      selectedFields.add(solrTable.allFields.get(field));
-    }
+  /** Creates a SolrEnumerator.
+   *
+   * @param tupleStream Solr TupleStream
+   * @param protoRowType The type of resulting rows
+   */
+  SolrEnumerator(TupleStream tupleStream, RelProtoDataType protoRowType) {
+    this.tupleStream = tupleStream;
+    this.current = null;
 
-    try {
-      Map<String, String> solrParams = new HashMap<>();
-      solrParams.put(CommonParams.Q, "*:*");
-      solrParams.put(CommonParams.FL, String.join(",", selectedFields) + ",_version_");
-      solrParams.put(CommonParams.SORT, "_version_ desc");
-      //solrParams.put(CommonParams.QT, "/export");
+    final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+    this.fieldTypes = protoRowType.apply(typeFactory).getFieldList();
+  }
 
-      cloudSolrStream = new CloudSolrStream(solrTable.cloudSolrClient.getZkHost(), solrTable.collection, solrParams);
-      cloudSolrStream.open();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+  /** Produce the next row from the results
+   *
+   * @return A new row from the results
+   */
+  public Object current() {
+    if (fieldTypes.size() == 1) {
+      // If we just have one field, produce it directly
+      RelDataTypeField relDataTypeField = fieldTypes.get(0);
+      return currentTupleField(relDataTypeField.getKey());
+    } else {
+      // Build an array with all fields in this row
+      Object[] row = new Object[fieldTypes.size()];
+      for (int i = 0; i < fieldTypes.size(); i++) {
+        RelDataTypeField relDataTypeField = fieldTypes.get(i);
+        row[i] = currentTupleField(relDataTypeField.getKey());
+      }
+
+      return row;
     }
   }
 
-  public Object current() {
-    return current;
+  /** Get a field for the current tuple from the underlying object.
+   *
+   * @param field String of field to get
+   */
+  private Object currentTupleField(String field) {
+    return current.get(field);
   }
 
   public boolean moveNext() {
     try {
-      Tuple tuple = cloudSolrStream.read();
-      if (!tuple.EOF) {
-        current = this.converter(tuple);
-        return true;
-      } else {
-        current = null;
+      Tuple tuple = this.tupleStream.read();
+      if (tuple.EOF) {
         return false;
+      } else {
+        current = tuple;
+        return true;
       }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return false;
     }
   }
 
@@ -77,39 +96,12 @@ class SolrEnumerator implements Enumerator<Object> {
   }
 
   public void close() {
-    try {
-      cloudSolrStream.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private Object converter(Tuple tuple) {
-    List<Object> row = new ArrayList<>(selectedFields.size());
-    for(String field : selectedFields) {
-      Object o = tuple.get(field);
-      if(o instanceof List) {
-        row.add(((List)o).get(0));
-      } else {
-        row.add(o);
+    if(this.tupleStream != null) {
+      try {
+        this.tupleStream.close();
+      } catch (IOException e) {
+        e.printStackTrace();
       }
     }
-
-    Object[] ret = row.toArray(new Object[selectedFields.size()]);
-
-    if(selectedFields.size() == 1) {
-      return ret[0];
-    } else {
-      return ret;
-    }
-  }
-
-  /** Returns an array of integers {0, ..., n - 1}. */
-  static int[] identityList(int n) {
-    int[] integers = new int[n];
-    for (int i = 0; i < n; i++) {
-      integers[i] = i;
-    }
-    return integers;
   }
 }

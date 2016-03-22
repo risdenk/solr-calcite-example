@@ -16,19 +16,31 @@
  */
 package org.apache.solr.adapter;
 
-import org.apache.calcite.schema.Schema;
-import org.apache.calcite.schema.SchemaFactory;
-import org.apache.calcite.schema.SchemaPlus;
+import com.google.common.collect.ImmutableMap;
+import org.apache.calcite.linq4j.tree.Types;
 
-import java.util.Map;
+import java.lang.reflect.Method;
+import java.util.List;
 
-@SuppressWarnings("UnusedDeclaration")
-public class SolrSchemaFactory implements SchemaFactory {
-  public SolrSchemaFactory() {
+/**
+ * Builtin methods in the Solr adapter.
+ */
+public enum SolrMethod {
+  SOLR_QUERYABLE_QUERY(SolrTable.SolrQueryable.class, "query", List.class, List.class, List.class, String.class);
+
+  public final Method method;
+
+  public static final ImmutableMap<Method, SolrMethod> MAP;
+
+  static {
+    final ImmutableMap.Builder<Method, SolrMethod> builder = ImmutableMap.builder();
+    for (SolrMethod value : SolrMethod.values()) {
+      builder.put(value.method, value);
+    }
+    MAP = builder.build();
   }
 
-  public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
-    final String zk = (String) operand.get("zk");
-    return new SolrSchema(zk);
+  SolrMethod(Class clazz, String methodName, Class... argumentTypes) {
+    this.method = Types.lookupMethod(clazz, methodName, argumentTypes);
   }
 }
