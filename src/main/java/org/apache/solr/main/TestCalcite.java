@@ -37,20 +37,8 @@ public class TestCalcite {
         try(Connection conn = DriverManager.getConnection("jdbc:calcite:", info)) {
             try(Statement stmt = conn.createStatement()) {
                 for(String sql : sqlQueries) {
-                    System.out.println("-----" + System.lineSeparator() + sql + System.lineSeparator() + "-----");
-                    try(ResultSet rs = stmt.executeQuery(sql)) {
-                        ResultSetMetaData rsMetaData = rs.getMetaData();
-                        while(rs.next()) {
-                            for (int i = 1; i <= rsMetaData.getColumnCount(); i++) {
-                                List<Object> outputList = new ArrayList<>();
-                                outputList.add(rsMetaData.getColumnName(i));
-                                outputList.add(rsMetaData.getColumnTypeName(i));
-                                outputList.add(rs.getString(i));
-                                System.out.println(outputList);
-                            }
-                            System.out.println();
-                        }
-                    }
+                    printExplain(stmt, sql);
+                    printResult(stmt, sql);
                 }
             }
         } catch (SQLException e) {
@@ -58,5 +46,38 @@ public class TestCalcite {
         }
 
         System.exit(0);
+    }
+
+    private static void printResult(Statement stmt, String sql) throws SQLException {
+        System.out.println("-----" + System.lineSeparator() + sql + System.lineSeparator() + "-----");
+        try(ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSetMetaData rsMetaData = rs.getMetaData();
+            while(rs.next()) {
+                for (int i = 1; i <= rsMetaData.getColumnCount(); i++) {
+                    List<Object> outputList = new ArrayList<>();
+                    outputList.add(rsMetaData.getColumnName(i));
+                    outputList.add(rsMetaData.getColumnTypeName(i));
+                    outputList.add(rs.getString(i));
+                    System.out.println(outputList);
+                }
+                System.out.println();
+            }
+        }
+    }
+
+    private static void printExplain(Statement stmt, String sql) throws SQLException {
+        String explainSQL = "explain plan for " + sql;
+        System.out.println("-----" + System.lineSeparator() + explainSQL + System.lineSeparator() + "-----");
+        try(ResultSet rs = stmt.executeQuery(explainSQL)) {
+            ResultSetMetaData rsMetaData = rs.getMetaData();
+            while(rs.next()) {
+                for (int i = 1; i <= rsMetaData.getColumnCount(); i++) {
+                    List<Object> outputList = new ArrayList<>();
+                    outputList.add(rs.getString(i));
+                    System.out.println(outputList);
+                }
+                System.out.println();
+            }
+        }
     }
 }
