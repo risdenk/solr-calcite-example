@@ -70,19 +70,8 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
    * @param filterQueries A list of filterQueries which should be used in the query
    * @return Enumerator of results
    */
-  public Enumerable<Object> query(final CloudSolrClient cloudSolrClient, List<Map.Entry<String, Class>> fields,
+  public Enumerable<Object> query(final CloudSolrClient cloudSolrClient, List<String> fields,
                                   List<String> filterQueries, List<String> order, String limit) {
-    // Build the type of the resulting row based on the provided fields
-    final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
-    final RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
-    List<String> fieldNames = new ArrayList<>();
-    for (Map.Entry<String, Class> field : fields) {
-      String fieldName = field.getKey();
-      fieldNames.add(fieldName);
-      fieldInfo.add(fieldName, typeFactory.createJavaType(field.getClass()));
-    }
-    final RelProtoDataType resultRowType = RelDataTypeImpl.proto(fieldInfo.build());
-
     Map<String, String> solrParams = new HashMap<>();
     solrParams.put(CommonParams.Q, "*:*");
     //solrParams.put(CommonParams.QT, "/export");
@@ -90,7 +79,7 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
     if (fields.isEmpty()) {
       solrParams.put(CommonParams.FL, "*");
     } else {
-      solrParams.put(CommonParams.FL, String.join(",", fieldNames));
+      solrParams.put(CommonParams.FL, String.join(",", fields));
     }
 
     if (filterQueries.isEmpty()) {
@@ -128,7 +117,7 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
           throw new RuntimeException(e);
         }
 
-        return new SolrEnumerator(cloudSolrStream, resultRowType);
+        return new SolrEnumerator(cloudSolrStream, fields);
       }
     };
   }
@@ -163,11 +152,10 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
 
     /** Called via code-generation.
      *
-     * @see org.apache.solr.adapter.SolrMethod#SOLR_QUERYABLE_QUERY
+     * @see SolrMethod#SOLR_QUERYABLE_QUERY
      */
     @SuppressWarnings("UnusedDeclaration")
-    public Enumerable<Object> query(List<Map.Entry<String, Class>> fields,
-                                    List<String> filterQueries, List<String> order, String limit) {
+    public Enumerable<Object> query(List<String> fields, List<String> filterQueries, List<String> order, String limit) {
       return getTable().query(getCloudSolrClient(), fields, filterQueries, order, limit);
     }
   }

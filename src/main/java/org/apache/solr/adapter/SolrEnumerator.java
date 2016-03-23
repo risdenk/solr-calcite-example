@@ -31,20 +31,18 @@ import java.util.List;
 /** Enumerator that reads from a Solr collection. */
 class SolrEnumerator implements Enumerator<Object> {
   private final TupleStream tupleStream;
+  private final List<String> fields;
   private Tuple current;
-  private List<RelDataTypeField> fieldTypes;
 
   /** Creates a SolrEnumerator.
    *
    * @param tupleStream Solr TupleStream
-   * @param protoRowType The type of resulting rows
+   * @param fields Fields to get from each Tuple
    */
-  SolrEnumerator(TupleStream tupleStream, RelProtoDataType protoRowType) {
+  SolrEnumerator(TupleStream tupleStream, List<String> fields) {
     this.tupleStream = tupleStream;
+    this.fields = fields;
     this.current = null;
-
-    final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
-    this.fieldTypes = protoRowType.apply(typeFactory).getFieldList();
   }
 
   /** Produce the next row from the results
@@ -52,28 +50,17 @@ class SolrEnumerator implements Enumerator<Object> {
    * @return A new row from the results
    */
   public Object current() {
-    if (fieldTypes.size() == 1) {
-      // If we just have one field, produce it directly
-      RelDataTypeField relDataTypeField = fieldTypes.get(0);
-      return currentTupleField(relDataTypeField.getKey());
+    if (fields.size() == 1) {
+      return current.get(fields.get(0));
     } else {
       // Build an array with all fields in this row
-      Object[] row = new Object[fieldTypes.size()];
-      for (int i = 0; i < fieldTypes.size(); i++) {
-        RelDataTypeField relDataTypeField = fieldTypes.get(i);
-        row[i] = currentTupleField(relDataTypeField.getKey());
+      Object[] row = new Object[fields.size()];
+      for (int i = 0; i < fields.size(); i++) {
+        row[i] = current.get(fields.get(i));
       }
 
       return row;
     }
-  }
-
-  /** Get a field for the current tuple from the underlying object.
-   *
-   * @param field String of field to get
-   */
-  private Object currentTupleField(String field) {
-    return current.get(field);
   }
 
   public boolean moveNext() {

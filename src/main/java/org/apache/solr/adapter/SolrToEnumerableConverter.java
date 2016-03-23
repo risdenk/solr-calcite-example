@@ -32,8 +32,9 @@ import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.calcite.util.Pair;
 
-import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Relational expression representing a scan of a table in Solr
@@ -61,22 +62,8 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
     final RelDataType rowType = getRowType();
     final PhysType physType = PhysTypeImpl.of(implementor.getTypeFactory(), rowType, pref.prefer(JavaRowFormat.ARRAY));
     final Expression table = list.append("table", solrImplementor.table.getExpression(SolrTable.SolrQueryable.class));
-    final Expression fields =
-        list.append("fields",
-            constantArrayList(
-                Pair.zip(SolrRules.solrFieldNames(rowType),
-                    new AbstractList<Class>() {
-                      @Override
-                      public Class get(int index) {
-                        return physType.fieldClass(index);
-                      }
-
-                      @Override
-                      public int size() {
-                        return rowType.getFieldCount();
-                      }
-                    }),
-                Pair.class));
+    final Expression fields = list.append("fields",
+        constantArrayList(generateFields(SolrRules.solrFieldNames(rowType), solrImplementor.fieldMappings), String.class));
     final Expression filterQueries = list.append("filterQueries", constantArrayList(solrImplementor.filterQueries, String.class));
     final Expression order = list.append("order", constantArrayList(solrImplementor.order, String.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
@@ -88,6 +75,18 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
     Hook.QUERY_PLAN.run(filterQueries);
     list.add(Expressions.return_(null, enumerable));
     return implementor.result(physType, list.toBlock());
+  }
+
+  private List<String> generateFields(List<String> queryFields, Map<String, String> fieldMappings) {
+    if(fieldMappings.isEmpty()) {
+      return queryFields;
+    } else {
+      List<String> fields = new ArrayList<>();
+      for(String field : queryFields) {
+        fields.add(fieldMappings.getOrDefault(field, field));
+      }
+      return fields;
+    }
   }
 
   /**

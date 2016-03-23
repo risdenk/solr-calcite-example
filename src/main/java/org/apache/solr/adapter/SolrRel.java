@@ -19,9 +19,12 @@ package org.apache.solr.adapter;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.util.Pair;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Relational expression that uses Solr calling convention.
@@ -34,7 +37,7 @@ public interface SolrRel extends RelNode {
 
   /** Callback for the implementation process that converts a tree of {@link SolrRel} nodes into a Solr query. */
   class Implementor {
-    final List<String> selectFields = new ArrayList<>();
+    final Map<String, String> fieldMappings = new HashMap<>();
     final List<String> filterQueries = new ArrayList<>();
     String limitValue = null;
     final List<String> order = new ArrayList<>();
@@ -47,9 +50,9 @@ public interface SolrRel extends RelNode {
      * @param fields New fields to be projected from a query
      * @param filterQueries New filterQueries to be applied to the query
      */
-    public void add(List<String> fields, List<String> filterQueries) {
-      if (fields != null) {
-        selectFields.addAll(fields);
+    public void add(Map<String, String> fieldMappings, List<String> filterQueries) {
+      if (fieldMappings != null) {
+        this.fieldMappings.putAll(fieldMappings);
       }
       if (filterQueries != null) {
         this.filterQueries.addAll(filterQueries);
