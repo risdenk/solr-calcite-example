@@ -75,7 +75,6 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
     // Build the type of the resulting row based on the provided fields
     final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
     final RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
-    final RelDataType rowType = protoRowType.apply(typeFactory);
     List<String> fieldNames = new ArrayList<>();
     for (Map.Entry<String, Class> field : fields) {
       String fieldName = field.getKey();

@@ -43,6 +43,7 @@ class SolrSchema extends AbstractSchema {
 
   @Override
   protected Map<String, Table> getTableMap() {
+    this.cloudSolrClient.connect();
     Set<String> collections = this.cloudSolrClient.getZkStateReader().getClusterState().getCollections();
     final ImmutableMap.Builder<String, Table> builder = ImmutableMap.builder();
     for (String collection : collections) {
@@ -83,8 +84,7 @@ class SolrSchema extends AbstractSchema {
           type = typeFactory.createJavaType(Long.class);
           break;
         default:
-          type = typeFactory.createJavaType(Object.class);
-          break;
+          type = typeFactory.createJavaType(String.class);
       }
 
       EnumSet<FieldFlag> flags = luceneFieldInfo.getFlags();
