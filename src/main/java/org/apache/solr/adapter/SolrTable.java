@@ -26,8 +26,6 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.impl.AbstractTableQueryable;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.Util;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.io.stream.CloudSolrStream;
 import org.apache.solr.client.solrj.io.stream.TupleStream;
@@ -69,11 +67,11 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
    *
    * @param cloudSolrClient Solr CloudSolrClient
    * @param fields List of fields to project
-   * @param predicates A list of predicates which should be used in the query
+   * @param filterQueries A list of filterQueries which should be used in the query
    * @return Enumerator of results
    */
   public Enumerable<Object> query(final CloudSolrClient cloudSolrClient, List<Map.Entry<String, Class>> fields,
-                                  List<String> predicates, List<String> order, String limit) {
+                                  List<String> filterQueries, List<String> order, String limit) {
     // Build the type of the resulting row based on the provided fields
     final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
     final RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
@@ -82,45 +80,44 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
     for (Map.Entry<String, Class> field : fields) {
       String fieldName = field.getKey();
       fieldNames.add(fieldName);
-      SqlTypeName typeName = rowType.getField(fieldName, true, false).getType().getSqlTypeName();
-      fieldInfo.add(fieldName, typeFactory.createSqlType(typeName)).nullable(true);
+      fieldInfo.add(fieldName, typeFactory.createJavaType(field.getClass()));
     }
     final RelProtoDataType resultRowType = RelDataTypeImpl.proto(fieldInfo.build());
 
-    // Construct the list of fields to project
-    final String selectFields;
+    Map<String, String> solrParams = new HashMap<>();
+    solrParams.put(CommonParams.Q, "*:*");
+    //solrParams.put(CommonParams.QT, "/export");
+
     if (fields.isEmpty()) {
-      selectFields = "*";
+      solrParams.put(CommonParams.FL, "*");
     } else {
-      selectFields = Util.toString(fieldNames, "", ", ", "");
+      solrParams.put(CommonParams.FL, String.join(",", fieldNames));
     }
 
-    // Combine all predicates conjunctively
-    String whereClause = "";
-    if (!predicates.isEmpty()) {
-      whereClause = " WHERE ";
-      whereClause += Util.toString(predicates, "", " AND ", "");
+    if (filterQueries.isEmpty()) {
+      solrParams.put(CommonParams.FQ, "*:*");
+    } else {
+      // SolrParams should be a ModifiableParams instead of a map so we could add multiple FQs
+      solrParams.put(CommonParams.FQ, String.join(" OR ", filterQueries));
     }
 
     // Build and issue the query and return an Enumerator over the results
-    StringBuilder queryBuilder = new StringBuilder("SELECT ");
-    queryBuilder.append(selectFields);
-    queryBuilder.append(" FROM \"").append(collection).append("\"");
-    queryBuilder.append(whereClause);
-    if (!order.isEmpty()) {
-      queryBuilder.append(Util.toString(order, " ORDER BY ", ", ", ""));
-    }
-    if (limit != null) {
-      queryBuilder.append(" LIMIT ").append(limit);
-    }
-    queryBuilder.append(" ALLOW FILTERING");
-    final String query = queryBuilder.toString();
+    if (order.isEmpty()) {
+      String DEFAULT_SORT_FIELD = "_version_";
+      solrParams.put(CommonParams.SORT, DEFAULT_SORT_FIELD + " desc");
 
-    Map<String, String> solrParams = new HashMap<>();
-    solrParams.put(CommonParams.Q, "*:*");
-    solrParams.put(CommonParams.FL, String.join(",", fieldNames) + ",_version_");
-    solrParams.put(CommonParams.SORT, "_version_ desc");
-    //solrParams.put(CommonParams.QT, "/export");
+      // Make sure the default sort field is in the field list
+      String fl = solrParams.get(CommonParams.FL);
+      if(!fl.contains(DEFAULT_SORT_FIELD)) {
+        solrParams.put(CommonParams.FL, String.join(",", fl, DEFAULT_SORT_FIELD));
+      }
+    } else {
+      solrParams.put(CommonParams.SORT, String.join(",", order));
+    }
+
+//    if (limit != null) {
+//      queryBuilder.append(" LIMIT ").append(limit);
+//    }
 
     return new AbstractEnumerable<Object>() {
       public Enumerator<Object> enumerator() {
@@ -171,8 +168,8 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
      */
     @SuppressWarnings("UnusedDeclaration")
     public Enumerable<Object> query(List<Map.Entry<String, Class>> fields,
-                                    List<String> predicates, List<String> order, String limit) {
-      return getTable().query(getCloudSolrClient(), fields, predicates, order, limit);
+                                    List<String> filterQueries, List<String> order, String limit) {
+      return getTable().query(getCloudSolrClient(), fields, filterQueries, order, limit);
     }
   }
 }

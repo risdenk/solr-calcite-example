@@ -35,24 +35,24 @@ public interface SolrRel extends RelNode {
   /** Callback for the implementation process that converts a tree of {@link SolrRel} nodes into a Solr query. */
   class Implementor {
     final List<String> selectFields = new ArrayList<>();
-    final List<String> whereClause = new ArrayList<>();
+    final List<String> filterQueries = new ArrayList<>();
     String limitValue = null;
     final List<String> order = new ArrayList<>();
 
     RelOptTable table;
     SolrTable solrTable;
 
-    /** Adds newly projected fields and restricted predicates.
+    /** Adds newly projected fields and restricted filterQueries.
      *
      * @param fields New fields to be projected from a query
-     * @param predicates New predicates to be applied to the query
+     * @param filterQueries New filterQueries to be applied to the query
      */
-    public void add(List<String> fields, List<String> predicates) {
+    public void add(List<String> fields, List<String> filterQueries) {
       if (fields != null) {
         selectFields.addAll(fields);
       }
-      if (predicates != null) {
-        whereClause.addAll(predicates);
+      if (filterQueries != null) {
+        this.filterQueries.addAll(filterQueries);
       }
     }
 

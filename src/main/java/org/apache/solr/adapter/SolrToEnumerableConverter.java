@@ -16,7 +16,6 @@
  */
 package org.apache.solr.adapter;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import org.apache.calcite.adapter.enumerable.*;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
@@ -39,9 +38,7 @@ import java.util.List;
 /**
  * Relational expression representing a scan of a table in Solr
  */
-public class SolrToEnumerableConverter
-  extends ConverterImpl
-  implements EnumerableRel {
+public class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
   protected SolrToEnumerableConverter(RelOptCluster cluster, RelTraitSet traits, RelNode input) {
     super(cluster, ConventionTraitDef.INSTANCE, traits, input);
   }
@@ -57,12 +54,13 @@ public class SolrToEnumerableConverter
   }
 
   public Result implement(EnumerableRelImplementor implementor, Prefer pref) {
-    // Generates a call to "query" with the appropriate fields and predicates
+    // Generates a call to "query" with the appropriate fields and filterQueries
     final BlockBuilder list = new BlockBuilder();
     final SolrRel.Implementor solrImplementor = new SolrRel.Implementor();
     solrImplementor.visitChild(0, getInput());
     final RelDataType rowType = getRowType();
     final PhysType physType = PhysTypeImpl.of(implementor.getTypeFactory(), rowType, pref.prefer(JavaRowFormat.ARRAY));
+    final Expression table = list.append("table", solrImplementor.table.getExpression(SolrTable.SolrQueryable.class));
     final Expression fields =
         list.append("fields",
             constantArrayList(
@@ -79,36 +77,33 @@ public class SolrToEnumerableConverter
                       }
                     }),
                 Pair.class));
-    final Expression table = list.append("table", solrImplementor.table.getExpression(SolrTable.SolrQueryable.class));
-    final Expression predicates = list.append("predicates", constantArrayList(solrImplementor.whereClause, String.class));
+    final Expression filterQueries = list.append("filterQueries", constantArrayList(solrImplementor.filterQueries, String.class));
     final Expression order = list.append("order", constantArrayList(solrImplementor.order, String.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
-    Expression enumerable = list.append("enumerable", Expressions.call(table,
-                SolrMethod.SOLR_QUERYABLE_QUERY.method, fields, predicates, order, limit));
+    Expression enumerable = list.append("enumerable", Expressions.call(table, SolrMethod.SOLR_QUERYABLE_QUERY.method,
+        fields, filterQueries, order, limit));
     if (CalcitePrepareImpl.DEBUG) {
-      System.out.println("Solr: " + predicates);
+      System.out.println("Solr: " + filterQueries);
     }
-    Hook.QUERY_PLAN.run(predicates);
+    Hook.QUERY_PLAN.run(filterQueries);
     list.add(Expressions.return_(null, enumerable));
     return implementor.result(physType, list.toBlock());
   }
 
-  /** E.g. {@code constantArrayList("x", "y")} returns
-   * "Arrays.asList('x', 'y')". */
+  /**
+   * E.g. {@code constantArrayList("x", "y")} returns
+   * "Arrays.asList('x', 'y')".
+   */
   private static <T> MethodCallExpression constantArrayList(List<T> values, Class clazz) {
-    return Expressions.call(
-        BuiltInMethod.ARRAYS_AS_LIST.method,
+    return Expressions.call(BuiltInMethod.ARRAYS_AS_LIST.method,
         Expressions.newArrayInit(clazz, constantList(values)));
   }
 
-  /** E.g. {@code constantList("x", "y")} returns
-   * {@code {ConstantExpression("x"), ConstantExpression("y")}}. */
+  /**
+   * E.g. {@code constantList("x", "y")} returns
+   * {@code {ConstantExpression("x"), ConstantExpression("y")}}.
+   */
   private static <T> List<Expression> constantList(List<T> values) {
-    return Lists.transform(values,
-        new Function<T, Expression>() {
-          public Expression apply(T a0) {
-            return Expressions.constant(a0);
-          }
-        });
+    return Lists.transform(values, Expressions::constant);
   }
 }

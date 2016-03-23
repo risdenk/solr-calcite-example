@@ -16,10 +16,11 @@
  */
 package org.apache.solr.adapter;
 
-import org.apache.calcite.plan.*;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -27,237 +28,150 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.util.Util;
+import org.apache.calcite.util.JsonBuilder;
+import org.apache.calcite.util.Pair;
 
-import java.util.*;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Implementation of a {@link org.apache.calcite.rel.core.Filter} relational expression in Solr.
  */
 public class SolrFilter extends Filter implements SolrRel {
-  private final List<String> partitionKeys;
-  private Boolean singlePartition;
-  private final List<String> clusteringKeys;
-  private List<RelFieldCollation> implicitFieldCollations;
-  private RelCollation implicitCollation;
-  private String match;
-
   public SolrFilter(
       RelOptCluster cluster,
       RelTraitSet traitSet,
       RelNode child,
-      RexNode condition,
-      List<String> partitionKeys,
-      List<String> clusteringKeys,
-      List<RelFieldCollation> implicitFieldCollations) {
+      RexNode condition) {
     super(cluster, traitSet, child, condition);
-
-    this.partitionKeys = partitionKeys;
-    this.singlePartition = false;
-    this.clusteringKeys = new ArrayList<String>(clusteringKeys);
-    this.implicitFieldCollations = implicitFieldCollations;
-
-    Translator translator =
-        new Translator(SolrRules.solrFieldNames(getRowType()),
-            partitionKeys, clusteringKeys, implicitFieldCollations);
-    this.match = translator.translateMatch(condition);
-    this.singlePartition = translator.isSinglePartition();
-    this.implicitCollation = translator.getImplicitCollation();
-
     assert getConvention() == SolrRel.CONVENTION;
     assert getConvention() == child.getConvention();
   }
 
-  @Override
-  public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                    RelMetadataQuery mq) {
+  @Override public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     return super.computeSelfCost(planner, mq).multiplyBy(0.1);
   }
 
-  public SolrFilter copy(RelTraitSet traitSet, RelNode input,
-                         RexNode condition) {
-    return new SolrFilter(getCluster(), traitSet, input, condition,
-        partitionKeys, clusteringKeys, implicitFieldCollations);
+  public SolrFilter copy(RelTraitSet traitSet, RelNode input, RexNode condition) {
+    return new SolrFilter(getCluster(), traitSet, input, condition);
   }
 
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
-    implementor.add(null, Collections.singletonList(match));
+    Translator translator = new Translator(SolrRules.solrFieldNames(getRowType()));
+    List<String> fqs = translator.translateMatch(condition);
+    implementor.add(null, fqs);
   }
 
-  /** Check if the filter restricts to a single partition.
-   *
-   * @return True if the filter will restrict the underlying to a single partition
-   */
-  public boolean isSinglePartition() {
-    return singlePartition;
-  }
-
-  /** Get the resulting collation by the clustering keys after filtering.
-   *
-   * @return The implicit collation based on the natural sorting by clustering keys
-   */
-  public RelCollation getImplicitCollation() {
-    return implicitCollation;
-  }
-
-  /** Translates {@link RexNode} expressions into Cassandra expression strings. */
-  static class Translator {
+  /** Translates {@link RexNode} expressions into Solr fq strings. */
+  private static class Translator {
     private final List<String> fieldNames;
-    private final Set<String> partitionKeys;
-    private final List<String> clusteringKeys;
-    private int restrictedClusteringKeys;
-    private final List<RelFieldCollation> implicitFieldCollations;
 
-    Translator(List<String> fieldNames, List<String> partitionKeys, List<String> clusteringKeys,
-               List<RelFieldCollation> implicitFieldCollations) {
+    Translator(List<String> fieldNames) {
       this.fieldNames = fieldNames;
-      this.partitionKeys = new HashSet<String>(partitionKeys);
-      this.clusteringKeys = clusteringKeys;
-      this.restrictedClusteringKeys = 0;
-      this.implicitFieldCollations = implicitFieldCollations;
     }
 
-    /** Check if the query spans only one partition.
-     *
-     * @return True if the matches translated so far have resulted in a single partition
-     */
-    public boolean isSinglePartition() {
-      return partitionKeys.isEmpty();
+    private List<String> translateMatch(RexNode condition) {
+      return translateOr(condition);
     }
 
-    /** Infer the implicit correlation from the unrestricted clustering keys.
-     *
-     * @return The collation of the filtered results
-     */
-    public RelCollation getImplicitCollation() {
-      // No collation applies if we aren't restricted to a single partition
-      if (!isSinglePartition()) {
-        return RelCollations.EMPTY;
+    private List<String> translateOr(RexNode condition) {
+      List<String> list = new ArrayList<>();
+      for (RexNode node : RelOptUtil.disjunctions(condition)) {
+        list.add(translateAnd(node));
+      }
+      return list;
+    }
+
+    /** Translates a condition that may be an AND of other conditions. Gathers
+     * together conditions that apply to the same field. */
+    private String translateAnd(RexNode node0) {
+      List<String> ands = new ArrayList<>();
+      for (RexNode node : RelOptUtil.conjunctions(node0)) {
+        ands.add(translateMatch2(node));
       }
 
-      // Pull out the correct fields along with their original collations
-      List<RelFieldCollation> fieldCollations = new ArrayList<RelFieldCollation>();
-      for (int i = restrictedClusteringKeys; i < clusteringKeys.size(); i++) {
-        int fieldIndex = fieldNames.indexOf(clusteringKeys.get(i));
-        RelFieldCollation.Direction direction = implicitFieldCollations.get(i).getDirection();
-        fieldCollations.add(new RelFieldCollation(fieldIndex, direction));
-      }
-
-      return RelCollations.of(fieldCollations);
+      return String.join(" AND ", ands);
     }
 
-    /** Produce the CQL predicate string for the given condition.
-     *
-     * @param condition Condition to translate
-     * @return CQL predicate string
-     */
-    private String translateMatch(RexNode condition) {
-      // CQL does not support disjunctions
-      List<RexNode> disjunctions = RelOptUtil.disjunctions(condition);
-      if (disjunctions.size() == 1) {
-        return translateAnd(disjunctions.get(0));
-      } else {
-        throw new AssertionError("cannot translate " + condition);
-      }
-    }
-
-    /** Conver the value of a literal to a string.
-     *
-     * @param literal Literal to translate
-     * @return String representation of the literal
-     */
-    private static String literalValue(RexLiteral literal) {
-      Object value = literal.getValue2();
-      return String.valueOf(value);
-    }
-
-    /** Translate a conjunctive predicate to a CQL string.
-     *
-     * @param condition A conjunctive predicate
-     * @return CQL string for the predicate
-     */
-    private String translateAnd(RexNode condition) {
-      List<String> predicates = new ArrayList<String>();
-      for (RexNode node : RelOptUtil.conjunctions(condition)) {
-        predicates.add(translateMatch2(node));
-      }
-
-      return Util.toString(predicates, "", " AND ", "");
-    }
-
-    /** Translate a binary relation. */
     private String translateMatch2(RexNode node) {
-      // We currently only use equality, but inequalities on clustering keys
-      // should be possible in the future
       switch (node.getKind()) {
-      case EQUALS:
-        return translateBinary("=", "=", (RexCall) node);
-      case LESS_THAN:
-        return translateBinary("<", ">", (RexCall) node);
-      case LESS_THAN_OR_EQUAL:
-        return translateBinary("<=", ">=", (RexCall) node);
-      case GREATER_THAN:
-        return translateBinary(">", "<", (RexCall) node);
-      case GREATER_THAN_OR_EQUAL:
-        return translateBinary(">=", "<=", (RexCall) node);
-      default:
-        throw new AssertionError("cannot translate " + node);
+        case EQUALS:
+          return translateBinary(null, null, (RexCall) node);
+//        case LESS_THAN:
+//          return translateBinary("$lt", "$gt", (RexCall) node);
+//        case LESS_THAN_OR_EQUAL:
+//          return translateBinary("$lte", "$gte", (RexCall) node);
+//        case NOT_EQUALS:
+//          return translateBinary("$ne", "$ne", (RexCall) node);
+//        case GREATER_THAN:
+//          return translateBinary("$gt", "$lt", (RexCall) node);
+//        case GREATER_THAN_OR_EQUAL:
+//          return translateBinary("$gte", "$lte", (RexCall) node);
+        default:
+          throw new AssertionError("cannot translate " + node);
       }
     }
 
-    /** Translates a call to a binary operator, reversing arguments if
-     * necessary. */
+    /** Translates a call to a binary operator, reversing arguments if necessary. */
     private String translateBinary(String op, String rop, RexCall call) {
       final RexNode left = call.operands.get(0);
       final RexNode right = call.operands.get(1);
-      String expression = translateBinary2(op, left, right);
-      if (expression != null) {
-        return expression;
+      String b = translateBinary2(op, left, right);
+      if (b != null) {
+        return b;
       }
-      expression = translateBinary2(rop, right, left);
-      if (expression != null) {
-        return expression;
+      b = translateBinary2(rop, right, left);
+      if (b != null) {
+        return b;
       }
       throw new AssertionError("cannot translate op " + op + " call " + call);
     }
 
-    /** Translates a call to a binary operator. Returns null on failure. */
+    /** Translates a call to a binary operator. Returns whether successful. */
     private String translateBinary2(String op, RexNode left, RexNode right) {
       switch (right.getKind()) {
-      case LITERAL:
-        break;
-      default:
-        return null;
+        case LITERAL:
+          break;
+        default:
+          return null;
       }
       final RexLiteral rightLiteral = (RexLiteral) right;
       switch (left.getKind()) {
-      case INPUT_REF:
-        final RexInputRef left1 = (RexInputRef) left;
-        String name = fieldNames.get(left1.getIndex());
-        return translateOp2(op, name, rightLiteral);
-      case CAST:
-        // FIXME This will not work in all cases (for example, we ignore string encoding)
-        return translateBinary2(op, ((RexCall) left).operands.get(0), right);
-      default:
-        return null;
+        case INPUT_REF:
+          final RexInputRef left1 = (RexInputRef) left;
+          String name = fieldNames.get(left1.getIndex());
+          return translateOp2(op, name, rightLiteral);
+        case CAST:
+          return translateBinary2(op, ((RexCall) left).operands.get(0), right);
+        case OTHER_FUNCTION:
+//          String itemName = SolrRules.isItem((RexCall) left);
+//          if (itemName != null) {
+//            return translateOp2(op, itemName, rightLiteral);
+//          }
+          // fall through
+        default:
+          return null;
       }
     }
 
-    /** Combines a field name, operator, and literal to produce a predicate string. */
     private String translateOp2(String op, String name, RexLiteral right) {
-      // In case this is a key, record that it is now restricted
-      if (op.equals("=")) {
-        partitionKeys.remove(name);
-        if (clusteringKeys.contains(name)) {
-          restrictedClusteringKeys++;
-        }
+      if (op == null) {
+        // E.g.: {deptno: 100}
+        return name + ":" + right.getValue2();
+      } else {
+//        // E.g. {deptno: {$lt: 100}}
+//        // which may later be combined with other conditions:
+//        // E.g. {deptno: [$lt: 100, $gt: 50]}
+//        multimap.put(name, Pair.of(op, right));
+        return null;
       }
-
-      Object value = literalValue(right);
-      String valueString = value.toString();
-      valueString = "'" + valueString + "'";
-      return name + " " + op + " " + valueString;
     }
   }
 }

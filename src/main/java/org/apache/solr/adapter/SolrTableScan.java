@@ -27,8 +27,8 @@ import java.util.List;
  * Relational expression representing a scan of a Solr collection.
  */
 class SolrTableScan extends TableScan implements SolrRel {
-  private final SolrTable solrTable;
-  private final RelDataType projectRowType;
+  final SolrTable solrTable;
+  final RelDataType projectRowType;
 
   /**
    * Creates a SolrTableScan.
