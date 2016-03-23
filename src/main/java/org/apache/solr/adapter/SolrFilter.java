@@ -16,11 +16,7 @@
  */
 package org.apache.solr.adapter;
 
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -28,17 +24,9 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.util.JsonBuilder;
-import org.apache.calcite.util.Pair;
-
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Implementation of a {@link org.apache.calcite.rel.core.Filter} relational expression in Solr.
@@ -54,7 +42,8 @@ public class SolrFilter extends Filter implements SolrRel {
     assert getConvention() == child.getConvention();
   }
 
-  @Override public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+  @Override
+  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     return super.computeSelfCost(planner, mq).multiplyBy(0.1);
   }
 
@@ -69,7 +58,9 @@ public class SolrFilter extends Filter implements SolrRel {
     implementor.add(null, fqs);
   }
 
-  /** Translates {@link RexNode} expressions into Solr fq strings. */
+  /**
+   * Translates {@link RexNode} expressions into Solr fq strings.
+   */
   private static class Translator {
     private final List<String> fieldNames;
 
@@ -89,8 +80,10 @@ public class SolrFilter extends Filter implements SolrRel {
       return list;
     }
 
-    /** Translates a condition that may be an AND of other conditions. Gathers
-     * together conditions that apply to the same field. */
+    /**
+     * Translates a condition that may be an AND of other conditions. Gathers
+     * together conditions that apply to the same field.
+     */
     private String translateAnd(RexNode node0) {
       List<String> ands = new ArrayList<>();
       for (RexNode node : RelOptUtil.conjunctions(node0)) {
@@ -119,7 +112,9 @@ public class SolrFilter extends Filter implements SolrRel {
       }
     }
 
-    /** Translates a call to a binary operator, reversing arguments if necessary. */
+    /**
+     * Translates a call to a binary operator, reversing arguments if necessary.
+     */
     private String translateBinary(String op, String rop, RexCall call) {
       final RexNode left = call.operands.get(0);
       final RexNode right = call.operands.get(1);
@@ -134,7 +129,9 @@ public class SolrFilter extends Filter implements SolrRel {
       throw new AssertionError("cannot translate op " + op + " call " + call);
     }
 
-    /** Translates a call to a binary operator. Returns whether successful. */
+    /**
+     * Translates a call to a binary operator. Returns whether successful.
+     */
     private String translateBinary2(String op, RexNode left, RexNode right) {
       switch (right.getKind()) {
         case LITERAL:

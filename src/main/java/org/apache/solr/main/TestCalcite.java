@@ -16,6 +16,7 @@ public class TestCalcite {
     sqlQueries.add("select * from test limit 2");
     sqlQueries.add("select * from test where fielda = 'a1'");
     sqlQueries.add("select * from test where fielda = '(a1 a2)'");
+//    sqlQueries.add("select * from test where fielda = fieldb");
     sqlQueries.add("select fielda from test");
     sqlQueries.add("select fielda from test limit 2");
     sqlQueries.add("select fielda from test where fielda = 'a1'");

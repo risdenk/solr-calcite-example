@@ -71,7 +71,7 @@ class SolrSchema extends AbstractSchema {
     final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
     final RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
     Map<String, LukeResponse.FieldInfo> luceneFieldInfoMap = getFieldInfo(collection);
-    for(Map.Entry<String, LukeResponse.FieldInfo> entry : luceneFieldInfoMap.entrySet()) {
+    for (Map.Entry<String, LukeResponse.FieldInfo> entry : luceneFieldInfoMap.entrySet()) {
       LukeResponse.FieldInfo luceneFieldInfo = entry.getValue();
 
       RelDataType type;
@@ -88,7 +88,7 @@ class SolrSchema extends AbstractSchema {
       }
 
       EnumSet<FieldFlag> flags = luceneFieldInfo.getFlags();
-      if(flags != null && flags.contains(FieldFlag.MULTI_VALUED)) {
+      if (flags != null && flags.contains(FieldFlag.MULTI_VALUED)) {
         type = typeFactory.createArrayType(type, -1);
       }
 

@@ -19,7 +19,9 @@ package org.apache.solr.adapter;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
-import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -39,13 +41,14 @@ import java.util.List;
  * calling convention.
  */
 public class SolrRules {
-  private SolrRules() {}
-
   static final RelOptRule[] RULES = {
-    SolrFilterRule.INSTANCE,
-    SolrProjectRule.INSTANCE,
+      SolrFilterRule.INSTANCE,
+      SolrProjectRule.INSTANCE,
 //    SolrSortRule.INSTANCE
   };
+
+  private SolrRules() {
+  }
 
   static List<String> solrFieldNames(final RelDataType rowType) {
     return SqlValidatorUtil.uniquify(
@@ -62,7 +65,9 @@ public class SolrRules {
         });
   }
 
-  /** Translator from {@link RexNode} to strings in Solr's expression language. */
+  /**
+   * Translator from {@link RexNode} to strings in Solr's expression language.
+   */
   static class RexToSolrTranslator extends RexVisitorImpl<String> {
     private final JavaTypeFactory typeFactory;
     private final List<String> inFields;
@@ -79,7 +84,9 @@ public class SolrRules {
     }
   }
 
-  /** Base class for planner rules that convert a relational expression to Solr calling convention. */
+  /**
+   * Base class for planner rules that convert a relational expression to Solr calling convention.
+   */
   abstract static class SolrConverterRule extends ConverterRule {
     final Convention out;
 

@@ -17,27 +17,25 @@
 package org.apache.solr.adapter;
 
 import org.apache.calcite.linq4j.Enumerator;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
-import org.apache.calcite.rel.type.RelProtoDataType;
-import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.stream.TupleStream;
 
 import java.io.IOException;
 import java.util.List;
 
-/** Enumerator that reads from a Solr collection. */
+/**
+ * Enumerator that reads from a Solr collection.
+ */
 class SolrEnumerator implements Enumerator<Object> {
   private final TupleStream tupleStream;
   private final List<String> fields;
   private Tuple current;
 
-  /** Creates a SolrEnumerator.
+  /**
+   * Creates a SolrEnumerator.
    *
    * @param tupleStream Solr TupleStream
-   * @param fields Fields to get from each Tuple
+   * @param fields      Fields to get from each Tuple
    */
   SolrEnumerator(TupleStream tupleStream, List<String> fields) {
     this.tupleStream = tupleStream;
@@ -45,7 +43,8 @@ class SolrEnumerator implements Enumerator<Object> {
     this.current = null;
   }
 
-  /** Produce the next row from the results
+  /**
+   * Produce the next row from the results
    *
    * @return A new row from the results
    */
@@ -83,7 +82,7 @@ class SolrEnumerator implements Enumerator<Object> {
   }
 
   public void close() {
-    if(this.tupleStream != null) {
+    if (this.tupleStream != null) {
       try {
         this.tupleStream.close();
       } catch (IOException e) {

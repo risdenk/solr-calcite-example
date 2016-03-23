@@ -19,7 +19,6 @@ package org.apache.solr.adapter;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,24 +29,28 @@ import java.util.Map;
  * Relational expression that uses Solr calling convention.
  */
 public interface SolrRel extends RelNode {
-  void implement(Implementor implementor);
-
-  /** Calling convention for relational operations that occur in Cassandra. */
+  /**
+   * Calling convention for relational operations that occur in Cassandra.
+   */
   Convention CONVENTION = new Convention.Impl("SOLR", SolrRel.class);
 
-  /** Callback for the implementation process that converts a tree of {@link SolrRel} nodes into a Solr query. */
+  void implement(Implementor implementor);
+
+  /**
+   * Callback for the implementation process that converts a tree of {@link SolrRel} nodes into a Solr query.
+   */
   class Implementor {
     final Map<String, String> fieldMappings = new HashMap<>();
     final List<String> filterQueries = new ArrayList<>();
-    String limitValue = null;
     final List<String> order = new ArrayList<>();
-
+    String limitValue = null;
     RelOptTable table;
     SolrTable solrTable;
 
-    /** Adds newly projected fields and restricted filterQueries.
+    /**
+     * Adds newly projected fields and restricted filterQueries.
      *
-     * @param fields New fields to be projected from a query
+     * @param fields        New fields to be projected from a query
      * @param filterQueries New filterQueries to be applied to the query
      */
     public void add(Map<String, String> fieldMappings, List<String> filterQueries) {

@@ -30,7 +30,6 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.util.BuiltInMethod;
-import org.apache.calcite.util.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +41,23 @@ import java.util.Map;
 public class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
   protected SolrToEnumerableConverter(RelOptCluster cluster, RelTraitSet traits, RelNode input) {
     super(cluster, ConventionTraitDef.INSTANCE, traits, input);
+  }
+
+  /**
+   * E.g. {@code constantArrayList("x", "y")} returns
+   * "Arrays.asList('x', 'y')".
+   */
+  private static <T> MethodCallExpression constantArrayList(List<T> values, Class clazz) {
+    return Expressions.call(BuiltInMethod.ARRAYS_AS_LIST.method,
+        Expressions.newArrayInit(clazz, constantList(values)));
+  }
+
+  /**
+   * E.g. {@code constantList("x", "y")} returns
+   * {@code {ConstantExpression("x"), ConstantExpression("y")}}.
+   */
+  private static <T> List<Expression> constantList(List<T> values) {
+    return Lists.transform(values, Expressions::constant);
   }
 
   @Override
@@ -78,31 +94,14 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
   }
 
   private List<String> generateFields(List<String> queryFields, Map<String, String> fieldMappings) {
-    if(fieldMappings.isEmpty()) {
+    if (fieldMappings.isEmpty()) {
       return queryFields;
     } else {
       List<String> fields = new ArrayList<>();
-      for(String field : queryFields) {
+      for (String field : queryFields) {
         fields.add(fieldMappings.getOrDefault(field, field));
       }
       return fields;
     }
-  }
-
-  /**
-   * E.g. {@code constantArrayList("x", "y")} returns
-   * "Arrays.asList('x', 'y')".
-   */
-  private static <T> MethodCallExpression constantArrayList(List<T> values, Class clazz) {
-    return Expressions.call(BuiltInMethod.ARRAYS_AS_LIST.method,
-        Expressions.newArrayInit(clazz, constantList(values)));
-  }
-
-  /**
-   * E.g. {@code constantList("x", "y")} returns
-   * {@code {ConstantExpression("x"), ConstantExpression("y")}}.
-   */
-  private static <T> List<Expression> constantList(List<T> values) {
-    return Lists.transform(values, Expressions::constant);
   }
 }

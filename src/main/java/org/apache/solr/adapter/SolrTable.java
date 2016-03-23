@@ -21,18 +21,22 @@ import org.apache.calcite.linq4j.*;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.type.*;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.impl.AbstractTableQueryable;
-import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.io.stream.CloudSolrStream;
 import org.apache.solr.client.solrj.io.stream.TupleStream;
 import org.apache.solr.common.params.CommonParams;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Table based on a Solr collection
@@ -58,16 +62,17 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
     }
     return protoRowType.apply(typeFactory);
   }
-  
+
   public Enumerable<Object> query(final CloudSolrClient cloudSolrClient) {
     return query(cloudSolrClient, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null);
   }
 
-  /** Executes a Solr query on the underlying table.
+  /**
+   * Executes a Solr query on the underlying table.
    *
    * @param cloudSolrClient Solr CloudSolrClient
-   * @param fields List of fields to project
-   * @param filterQueries A list of filterQueries which should be used in the query
+   * @param fields          List of fields to project
+   * @param filterQueries   A list of filterQueries which should be used in the query
    * @return Enumerator of results
    */
   public Enumerable<Object> query(final CloudSolrClient cloudSolrClient, List<String> fields,
@@ -96,7 +101,7 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
 
       // Make sure the default sort field is in the field list
       String fl = solrParams.get(CommonParams.FL);
-      if(!fl.contains(DEFAULT_SORT_FIELD)) {
+      if (!fl.contains(DEFAULT_SORT_FIELD)) {
         solrParams.put(CommonParams.FL, String.join(",", fl, DEFAULT_SORT_FIELD));
       }
     } else {
@@ -150,7 +155,8 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
       return schema.unwrap(SolrSchema.class).cloudSolrClient;
     }
 
-    /** Called via code-generation.
+    /**
+     * Called via code-generation.
      *
      * @see SolrMethod#SOLR_QUERYABLE_QUERY
      */

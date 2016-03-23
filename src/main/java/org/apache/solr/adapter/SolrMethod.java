@@ -28,8 +28,6 @@ import java.util.List;
 public enum SolrMethod {
   SOLR_QUERYABLE_QUERY(SolrTable.SolrQueryable.class, "query", List.class, List.class, List.class, String.class);
 
-  public final Method method;
-
   public static final ImmutableMap<Method, SolrMethod> MAP;
 
   static {
@@ -39,6 +37,8 @@ public enum SolrMethod {
     }
     MAP = builder.build();
   }
+
+  public final Method method;
 
   SolrMethod(Class clazz, String methodName, Class... argumentTypes) {
     this.method = Types.lookupMethod(clazz, methodName, argumentTypes);
