@@ -33,6 +33,12 @@ public class SolrAdapterTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
+    setupSolr();
+    indexDocs();
+    setupConnection();
+  }
+
+  private static void setupSolr() throws Exception {
     JettyConfig jettyConfig = JettyConfig.builder().setContext("/solr").build();
     Path tempDirectory = Files.createTempDirectory(SolrAdapterTest.class.getSimpleName());
     tempDirectory.toFile().deleteOnExit();
@@ -41,20 +47,6 @@ public class SolrAdapterTest {
     assertNotNull(solr_conf);
     miniSolrCloudCluster.uploadConfigDir(Paths.get(solr_conf.toURI()).toFile(), CONFIG_NAME);
     miniSolrCloudCluster.createCollection(COLLECTION_NAME, 1, 1, CONFIG_NAME, Collections.emptyMap());
-
-    indexDocs();
-
-    String driverClass = CalciteSolrDriver.class.getCanonicalName();
-    try {
-      Class.forName(driverClass);
-    } catch (ClassNotFoundException e) {
-      throw new IOException(e);
-    }
-
-    Properties properties = new Properties();
-    properties.setProperty("lex", Lex.MYSQL.toString());
-    properties.setProperty("zk", miniSolrCloudCluster.getZkServer().getZkAddress());
-    conn = DriverManager.getConnection("jdbc:calcitesolr:", properties);
   }
 
   private static void indexDocs() throws IOException, SolrServerException {
@@ -76,6 +68,20 @@ public class SolrAdapterTest {
 
     solrClient.add(COLLECTION_NAME, docs);
     solrClient.commit(COLLECTION_NAME);
+  }
+
+  private static void setupConnection() throws Exception {
+    String driverClass = CalciteSolrDriver.class.getCanonicalName();
+    try {
+      Class.forName(driverClass);
+    } catch (ClassNotFoundException e) {
+      throw new IOException(e);
+    }
+
+    Properties properties = new Properties();
+    properties.setProperty("lex", Lex.MYSQL.toString());
+    properties.setProperty("zk", miniSolrCloudCluster.getZkServer().getZkAddress());
+    conn = DriverManager.getConnection("jdbc:calcitesolr:", properties);
   }
 
   private static SolrInputDocument makeInputDoc(Integer id, String fielda, String fieldb, Integer fieldc, String fieldd,
