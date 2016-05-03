@@ -28,8 +28,10 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.impl.AbstractTableQueryable;
 import org.apache.solr.client.solrj.io.stream.CloudSolrStream;
+import org.apache.solr.client.solrj.io.stream.RollupStream;
 import org.apache.solr.client.solrj.io.stream.StatsStream;
 import org.apache.solr.client.solrj.io.stream.TupleStream;
+import org.apache.solr.client.solrj.io.stream.metrics.Bucket;
 import org.apache.solr.client.solrj.io.stream.metrics.Metric;
 import org.apache.solr.common.params.CommonParams;
 
@@ -66,7 +68,8 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
   }
   
   public Enumerable<Object> query(final Properties properties) {
-    return query(properties, Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList(), null);
+    return query(properties, Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList(),
+        Collections.emptyList(), null);
   }
 
   /** Executes a Solr query on the underlying table.
@@ -77,8 +80,8 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
    * @return Enumerator of results
    */
   public Enumerable<Object> query(final Properties properties, final List<String> fields,
-                                  final String query, final List<String> order, final List<Metric> metrics,
-                                  final String limit) {
+                                  final String query, final List<String> order, final List<String> buckets,
+                                  final List<Metric> metrics, final String limit) {
     // SolrParams should be a ModifiableParams instead of a map
     Map<String, String> solrParams = new HashMap<>();
     solrParams.put(CommonParams.OMIT_HEADER, "true");
@@ -130,9 +133,25 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
           tupleStream = new LimitStream(new CloudSolrStream(zk, collection, solrParams), Integer.parseInt(limit));
         }
       } else {
-        solrParams.remove(CommonParams.FL);
-        solrParams.remove(CommonParams.SORT);
-        tupleStream = new StatsStream(zk, collection, solrParams, metrics.toArray(new Metric[metrics.size()]));
+        Metric[] metricsArray = metrics.toArray(new Metric[metrics.size()]);
+        if(buckets.isEmpty()) {
+          solrParams.remove(CommonParams.FL);
+          solrParams.remove(CommonParams.SORT);
+          tupleStream = new StatsStream(zk, collection, solrParams, metricsArray);
+        } else {
+          List<Bucket> bucketsList = new ArrayList<>();
+          for(String bucket : buckets) {
+            bucketsList.add(new Bucket(bucket));
+          }
+
+          solrParams.put(CommonParams.QT, "/export");
+          for(Metric metric : metrics) {
+            fieldsList.remove(metric.getIdentifier());
+          }
+          solrParams.put(CommonParams.FL, String.join(",", fieldsList));
+          tupleStream = new CloudSolrStream(zk, collection, solrParams);
+          tupleStream = new RollupStream(tupleStream, bucketsList.toArray(new Bucket[bucketsList.size()]), metricsArray);
+        }
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -181,9 +200,9 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
      * @see SolrMethod#SOLR_QUERYABLE_QUERY
      */
     @SuppressWarnings("UnusedDeclaration")
-    public Enumerable<Object> query(List<String> fields, String query, List<String> order, List<Metric> metrics,
-                                    String limit) {
-      return getTable().query(getProperties(), fields, query, order, metrics, limit);
+    public Enumerable<Object> query(List<String> fields, String query, List<String> order, List<String> buckets,
+                                    List<Metric> metrics, String limit) {
+      return getTable().query(getProperties(), fields, query, order, buckets, metrics, limit);
     }
   }
 }

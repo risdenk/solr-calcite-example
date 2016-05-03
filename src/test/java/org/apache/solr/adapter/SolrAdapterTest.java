@@ -800,7 +800,7 @@ public class SolrAdapterTest {
 
   @Ignore("Can't currently handle count(FIELD) queries")
   @Test
-  public void testSelectCountSingleField() throws Exception {
+  public void testSelectCountField() throws Exception {
     String sql = "select count(fielda) from test";
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
@@ -812,25 +812,90 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
+  @Ignore("Broken because CountMetric returns a double instead of a long")
+  @Test
+  public void testSelectSingleFieldCountStarGroupBySingleField() throws Exception {
+    String sql = "select fielda, count(*) from test group by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Broken because CountMetric returns a double instead of a long")
+  @Test
+  public void testSelectSingleFieldCountOneGroupBySingleField() throws Exception {
+    String sql = "select fielda, count(1) from test group by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Can't currently handle count(FIELD) queries")
+  @Test
+  public void testSelectSingleFieldCountFieldGroupBySingleField() throws Exception {
+    String sql = "select fielda, count(fielda) from test group by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Can't currently handle count(FIELD) queries")
+  @Test
+  public void testSelectSingleFieldCountDifferentFieldGroupBySingleField() throws Exception {
+    String sql = "select fielda, count(fieldb) from test group by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Broken because CountMetric returns a double instead of a long")
+  @Test
+  public void testSelectSingleFieldCountStarGroupByMultipleFields() throws Exception {
+    String sql = "select fielda, fieldb, count(*) from test group by fielda, fieldb";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0, 5}], EXPR$2=[COUNT()])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("WIP")
+  @Test
+  public void testSelectSingleFieldAggregatesGroupBySingleField() throws Exception {
+    String sql = "select fielda, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0}], EXPR$1=[MIN($4)], EXPR$2=[MAX($4)], EXPR$3=[AVG($4)], EXPR$4=[SUM($4)])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
   @Test
   public void testAggregates() throws Exception {
     try(Statement stmt = conn.createStatement()) {
       String sql;
-
-      sql = "select count(*) from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select count(1) from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select count(fielda) from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
 
       sql = "select count(distinct fielda) from test";
       System.out.println(sql);
@@ -838,26 +903,6 @@ public class SolrAdapterTest {
       System.out.println();
 
       sql = "select sum(distinct fieldc) from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select fielda, count(*) from test group by fielda";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select fielda, count(1) from test group by fielda";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select fielda, count(fielda) from test group by fielda";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select fielda, count(fieldb) from test group by fielda";
       System.out.println(sql);
       System.out.println(getExplainPlan(stmt, sql));
       System.out.println();

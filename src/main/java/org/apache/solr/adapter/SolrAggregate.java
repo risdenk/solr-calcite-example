@@ -25,7 +25,6 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.calcite.util.Util;
 import org.apache.solr.client.solrj.io.stream.metrics.*;
 
 import java.util.*;
@@ -74,57 +73,17 @@ public class SolrAggregate extends Aggregate implements SolrRel {
       metrics.add(metric);
       fieldMappings.put(aggCall.getName(), metric.getIdentifier());
     }
+
+    List<String> buckets = new ArrayList<>();
+    for(int group : groupSet) {
+      final String inName = inNames.get(group);
+      buckets.add(inName);
+      fieldMappings.put(inName, inName);
+    }
+
+    implementor.addBuckets(buckets);
     implementor.addMetrics(metrics);
     implementor.addFieldMappings(fieldMappings);
-//    List<String> list = new ArrayList<>();
-//    int i = 0;
-//    if (groupSet.cardinality() == 1) {
-//      final String inName = inNames.get(groupSet.nth(0));
-//      list.add("_id: " + SolrRules.maybeQuote("$" + inName));
-//      ++i;
-//    } else {
-//      List<String> keys = new ArrayList<>();
-//      for (int group : groupSet) {
-//        final String inName = inNames.get(group);
-//        keys.add(inName + ": " + SolrRules.quote("$" + inName));
-//        ++i;
-//      }
-//      list.add("_id: " + Util.toString(keys, "{", ", ", "}"));
-//    }
-//    for (AggregateCall aggCall : aggCalls) {
-//      list.add(SolrRules.maybeQuote(outNames.get(i++)) + ": " + toSolr(aggCall.getAggregation(), inNames, aggCall.getArgList()));
-//    }
-//    implementor.add(null, "{$group: " + Util.toString(list, "{", ", ", "}") + "}");
-//    final List<String> fixups;
-//    if (groupSet.cardinality() == 1) {
-//      fixups = new AbstractList<String>() {
-//        @Override
-//        public String get(int index) {
-//          final String outName = outNames.get(index);
-//          return SolrRules.maybeQuote(outName) + ": " + SolrRules.maybeQuote("$" + (index == 0 ? "_id" : outName));
-//        }
-//
-//        @Override
-//        public int size() {
-//          return outNames.size();
-//        }
-//      };
-//    } else {
-//      fixups = new ArrayList<>();
-//      fixups.add("_id: 0");
-//      i = 0;
-//      for (int group : groupSet) {
-//        fixups.add(SolrRules.maybeQuote(outNames.get(group)) + ": " + SolrRules.maybeQuote("$_id." + outNames.get(group)));
-//        ++i;
-//      }
-//      for (AggregateCall ignored : aggCalls) {
-//        final String outName = outNames.get(i++);
-//        fixups.add(SolrRules.maybeQuote(outName) + ": " + SolrRules.maybeQuote("$" + outName));
-//      }
-//    }
-//    if (!groupSet.isEmpty()) {
-//      implementor.add(null, "{$project: " + Util.toString(fixups, "{", ", ", "}") + "}");
-//    }
   }
 
   private Metric toSolrMetric(SqlAggFunction aggregation, List<String> inNames, List<Integer> args) {

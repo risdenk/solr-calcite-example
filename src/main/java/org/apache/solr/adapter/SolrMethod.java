@@ -27,7 +27,7 @@ import java.util.List;
  */
 public enum SolrMethod {
   SOLR_QUERYABLE_QUERY(SolrTable.SolrQueryable.class, "query", List.class, String.class, List.class, List.class,
-      String.class);
+      List.class, String.class);
 
   public final Method method;
 

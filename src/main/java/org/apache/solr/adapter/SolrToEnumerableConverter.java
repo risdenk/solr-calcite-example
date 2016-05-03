@@ -39,8 +39,8 @@ import java.util.Map;
 /**
  * Relational expression representing a scan of a table in Solr
  */
-public class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
-  protected SolrToEnumerableConverter(RelOptCluster cluster, RelTraitSet traits, RelNode input) {
+class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
+  SolrToEnumerableConverter(RelOptCluster cluster, RelTraitSet traits, RelNode input) {
     super(cluster, ConventionTraitDef.INSTANCE, traits, input);
   }
 
@@ -66,10 +66,11 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
         constantArrayList(generateFields(SolrRules.solrFieldNames(rowType), solrImplementor.fieldMappings), String.class));
     final Expression filterQueries = list.append("query", Expressions.constant(solrImplementor.query, String.class));
     final Expression order = list.append("order", constantArrayList(solrImplementor.order, String.class));
+    final Expression buckets = list.append("buckets", constantArrayList(solrImplementor.buckets, String.class));
     final Expression metrics = list.append("metrics", constantArrayList(solrImplementor.metrics, Metric.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
     Expression enumerable = list.append("enumerable", Expressions.call(table, SolrMethod.SOLR_QUERYABLE_QUERY.method,
-        fields, filterQueries, order, metrics, limit));
+        fields, filterQueries, order, buckets, metrics, limit));
     if (CalcitePrepareImpl.DEBUG) {
       System.out.println("Solr: " + filterQueries);
     }

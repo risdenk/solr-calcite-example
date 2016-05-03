@@ -41,6 +41,7 @@ public interface SolrRel extends RelNode {
     String query = null;
     String limitValue = null;
     final List<String> order = new ArrayList<>();
+    final List<String> buckets = new ArrayList<>();
     final List<Metric> metrics = new ArrayList<>();
 
     RelOptTable table;
@@ -56,6 +57,10 @@ public interface SolrRel extends RelNode {
 
     void addOrder(List<String> newOrder) {
       order.addAll(newOrder);
+    }
+
+    void addBuckets(List<String> buckets) {
+      this.buckets.addAll(buckets);
     }
 
     void addMetrics(List<Metric> metrics) {
