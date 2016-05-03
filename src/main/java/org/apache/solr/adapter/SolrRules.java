@@ -69,14 +69,6 @@ class SolrRules {
         });
   }
 
-  public static String maybeQuote(String s) {
-    return s;
-  }
-
-  public static String quote(String s) {
-    return s;
-  }
-
   /** Translator from {@link RexNode} to strings in Solr's expression language. */
   static class RexToSolrTranslator extends RexVisitorImpl<String> {
     private final JavaTypeFactory typeFactory;
