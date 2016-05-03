@@ -17,11 +17,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 public class SolrAdapterTest {
@@ -30,6 +29,7 @@ public class SolrAdapterTest {
 
   private static MiniSolrCloudCluster miniSolrCloudCluster;
   private static Connection conn;
+  private static String zkAddress;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -43,10 +43,14 @@ public class SolrAdapterTest {
     Path tempDirectory = Files.createTempDirectory(SolrAdapterTest.class.getSimpleName());
     tempDirectory.toFile().deleteOnExit();
     miniSolrCloudCluster = new MiniSolrCloudCluster(1, tempDirectory, jettyConfig);
+
     URL solr_conf = SolrAdapterTest.class.getClassLoader().getResource("solr_conf");
     assertNotNull(solr_conf);
     miniSolrCloudCluster.uploadConfigDir(Paths.get(solr_conf.toURI()).toFile(), CONFIG_NAME);
+
     miniSolrCloudCluster.createCollection(COLLECTION_NAME, 1, 1, CONFIG_NAME, Collections.emptyMap());
+
+    zkAddress = miniSolrCloudCluster.getZkServer().getZkAddress();
   }
 
   private static void indexDocs() throws IOException, SolrServerException {
@@ -80,7 +84,7 @@ public class SolrAdapterTest {
 
     Properties properties = new Properties();
     properties.setProperty("lex", Lex.MYSQL.toString());
-    properties.setProperty("zk", miniSolrCloudCluster.getZkServer().getZkAddress());
+    properties.setProperty("zk", zkAddress);
     conn = DriverManager.getConnection("jdbc:calcitesolr:", properties);
   }
 
@@ -121,229 +125,682 @@ public class SolrAdapterTest {
   @Test
   public void testSelectStar() throws Exception {
     String sql = "select * from test";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectStarLimit() throws Exception {
     String sql = "select * from test limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrSort(fetch=[2])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Select * with no limit not supported")
   @Test
-  public void testSelectStarWhereEquality() throws Exception {
+  public void testSelectStarWhereEqual() throws Exception {
     String sql = "select * from test where fielda = 'a1'";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[=(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Select * with no limit not supported")
   @Test
-  public void testSelectStarWhereLuceneEquality() throws Exception {
+  public void testSelectStarWhereNotEqual() throws Exception {
+    String sql = "select * from test where fielda <> 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[<>(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectStarWhereLessThan() throws Exception {
+    String sql = "select * from test where fielda < 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[<($0, 'a1')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectStarWhereLessThanEqual() throws Exception {
+    String sql = "select * from test where fielda <= 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[<=($0, 'a1')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectStarWhereGreaterThan() throws Exception {
+    String sql = "select * from test where fielda > 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[>($0, 'a1')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectStarWhereGreaterThanEqual() throws Exception {
+    String sql = "select * from test where fielda >= 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[>=($0, 'a1')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectStarWhereLuceneEqual() throws Exception {
     String sql = "select * from test where fielda = '(a1 a2)'";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrFilter(condition=[=(CAST($0):VARCHAR(7) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", '(a1 a2)')])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Select * with no limit not supported")
+  @Ignore("Field equality is not supported")
   @Test
-  public void testSelectStarWhereFieldEquality() throws Exception {
+  public void testSelectStarWhereFieldEqual() throws Exception {
     String sql = "select * from test where fielda = fieldb";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectSingleField() throws Exception {
     String sql = "select fielda from test";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectSingleFieldLimit() throws Exception {
     String sql = "select fielda from test limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrSort(fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectSingleFieldOrderByLimit() throws Exception {
     String sql = "select fielda from test order by fielda limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrSort(sort0=[$0], dir0=[ASC], fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
-  public void testSelectSingleFieldWhereEquality() throws Exception {
+  public void testSelectSingleFieldWhereEqual() throws Exception {
     String sql = "select fielda from test where fielda = 'a1'";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[=(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
-  public void testSelectSingleFieldWhereLuceneEquality() throws Exception {
+  public void testSelectSingleFieldWhereNotEqual() throws Exception {
+    String sql = "select fielda from test where fielda <> 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[<>(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a2"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldWhereLessThan() throws Exception {
+    String sql = "select fielda from test where fielda < 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[<($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldWhereLessThanEqual() throws Exception {
+    String sql = "select fielda from test where fielda <= 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[<=($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldWhereGreaterThan() throws Exception {
+    String sql = "select fielda from test where fielda > 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[>($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a2"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldWhereGreaterThanEqual() throws Exception {
+    String sql = "select fielda from test where fielda >= 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[>=($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldWhereLuceneEqual() throws Exception {
     String sql = "select fielda from test where fielda = '(a1 a2)'";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrFilter(condition=[=(CAST($0):VARCHAR(7) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", '(a1 a2)')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Field equality is not supported")
+  @Test
+  public void testSelectSingleFieldWhereFieldEqual() throws Exception {
+    String sql = "select fielda from test where fielda = fieldb";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectSingleFieldAlias() throws Exception {
     String sql = "select fielda as abc from test";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectSingleFieldAliasLimit() throws Exception {
     String sql = "select fielda as abc from test limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrSort(fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectSingleFieldAliasOrderByLimit() throws Exception {
     String sql = "select fielda as abc from test order by abc limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0])\n" +
+        "    SolrSort(sort0=[$0], dir0=[ASC], fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectMultipleFields() throws Exception {
     String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectMultipleFieldsLimit() throws Exception {
     String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrSort(fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectMultipleFieldsOrderByLimit() throws Exception {
     String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test order by fielda limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrSort(sort0=[$0], dir0=[ASC], fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
-  public void testSelectMultipleFieldsWhereEquality() throws Exception {
+  public void testSelectMultipleFieldsWhereEqual() throws Exception {
     String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda = 'a1'";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[=(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
-  public void testSelectMultipleFieldsWhereLuceneEquality() throws Exception {
+  public void testSelectMultipleFieldsWhereNotEqual() throws Exception {
+    String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda <> 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[<>(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectMultipleFieldsWhereLessThan() throws Exception {
+    String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda < 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[<($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectMultipleFieldsWhereLessThanEqual() throws Exception {
+    String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda <= 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[<=($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectMultipleFieldsWhereGreaterThan() throws Exception {
+    String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda > 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[>($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectMultipleFieldsWhereGreaterThanEqual() throws Exception {
+    String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda >= 'a1'";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[>=($0, 'a1')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectMultipleFieldsWhereLuceneEqual() throws Exception {
     String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda = '(a1 a2)'";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrFilter(condition=[=(CAST($0):VARCHAR(7) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", '(a1 a2)')])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Field equality is not supported")
+  @Test
+  public void testSelectMultipleFieldsWhereFieldEqual() throws Exception {
+    String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda = fieldb";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectMultipleFieldsAlias() throws Exception {
     String sql = "select fielda as abc, fieldb, fieldc, fieldd_s, fielde_i from test";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(abc=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectMultipleFieldsAliasLimit() throws Exception {
     String sql = "select fielda as abc, fieldb, fieldc, fieldd_s, fielde_i from test limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(abc=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrSort(fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
   @Test
   public void testSelectMultipleFieldsAliasOrderByLimit() throws Exception {
     String sql = "select fielda as abc, fieldb, fieldc, fieldd_s, fielde_i from test order by abc limit 2";
-    try (Statement stmt = conn.createStatement()) {
-      printExplain(stmt, sql);
-      printResult(stmt, sql);
-    }
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(abc=[$0], fieldb=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "    SolrSort(sort0=[$0], dir0=[ASC], fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+
+    checkQuery(sql, explainPlan, result);
   }
 
 //select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda, fieldb
 //select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb
 
-  private void printExplain(Statement stmt, String sql) throws SQLException {
+  private String getExplainPlan(Statement stmt, String sql) throws SQLException {
     String explainSQL = "explain plan for " + sql;
-    System.out.println("-----" + System.lineSeparator() + explainSQL + System.lineSeparator() + "-----");
     try (ResultSet rs = stmt.executeQuery(explainSQL)) {
-      ResultSetMetaData rsMetaData = rs.getMetaData();
+      StringBuilder explainPlan = new StringBuilder();
       while (rs.next()) {
-        for (int i = 1; i <= rsMetaData.getColumnCount(); i++) {
-          List<Object> outputList = new ArrayList<>();
-          outputList.add(rs.getString(i));
-          System.out.println(outputList);
-        }
+        explainPlan.append(rs.getString(1));
       }
-      System.out.println();
+      return explainPlan.toString();
     }
   }
 
-  private void printResult(Statement stmt, String sql) throws SQLException {
-    System.out.println("-----" + System.lineSeparator() + sql + System.lineSeparator() + "-----");
+  private List<Object[]> getResult(Statement stmt, String sql) throws SQLException {
     try (ResultSet rs = stmt.executeQuery(sql)) {
       ResultSetMetaData rsMetaData = rs.getMetaData();
+      List<Object[]> result = new ArrayList<>();
       while (rs.next()) {
-        for (int i = 1; i <= rsMetaData.getColumnCount(); i++) {
-          List<Object> outputList = new ArrayList<>();
-          outputList.add(rsMetaData.getColumnName(i));
-          outputList.add(rsMetaData.getColumnLabel(i));
-          outputList.add(rsMetaData.getColumnTypeName(i));
-          outputList.add(rs.getString(i));
-          System.out.println(outputList);
+        Object[] row = new Object[rsMetaData.getColumnCount()];
+        for (int i = 0; i < rsMetaData.getColumnCount(); i++) {
+          // Force _version_ to be null since can't check it
+          if("_version_".equals(rsMetaData.getColumnName(i+1))) {
+            row[i] = null;
+          } else {
+            row[i] = rs.getObject(i+1);
+          }
         }
+        result.add(row);
       }
-      System.out.println();
+      return result;
+    }
+  }
+
+  private void assertResultEquals(List<Object[]> expected, List<Object[]> actual) throws Exception {
+    assertEquals(expected.size(), actual.size());
+    for(int i = 0; i < expected.size(); i++) {
+      Object[] expectedRow = expected.get(i);
+      Object[] actualRow = actual.get(i);
+      assertArrayEquals("Row " + i, expectedRow, actualRow);
+    }
+  }
+
+  private void checkQuery(String sql, String explainPlan, List<Object[]> result) throws Exception {
+    try (Statement stmt = conn.createStatement()) {
+      assertEquals(explainPlan, getExplainPlan(stmt, sql));
+      assertResultEquals(result, getResult(stmt, sql));
     }
   }
 }
