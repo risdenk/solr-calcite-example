@@ -334,6 +334,22 @@ public class SolrAdapterTest {
   }
 
   @Test
+  public void testSelectSingleFieldOrderByDifferentFieldLimit() throws Exception {
+    String sql = "select fielda from test order by fieldb limit 2";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrProject(fielda=[$0], fieldb=[$5])\n" +
+        "    SolrSort(sort0=[$5], dir0=[ASC], fetch=[2])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
   public void testSelectSingleFieldWhereEqual() throws Exception {
     String sql = "select fielda from test where fielda = 'a1'";
 
@@ -505,7 +521,7 @@ public class SolrAdapterTest {
 
   @Test
   public void testSelectSingleFieldAliasOrderByLimit() throws Exception {
-    String sql = "select fielda as abc from test order by abc limit 2";
+    String sql = "select fielda as abc from test order by abc asc limit 2";
 
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrProject(fielda=[$0])\n" +
@@ -754,8 +770,109 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-//select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda, fieldb
-//select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb
+  @Test
+  public void testSelectCountStar() throws Exception {
+    String sql = "select count(*) from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT()])\n" +
+        "    SolrProject(DUMMY=[0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {5L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectCountOne() throws Exception {
+    String sql = "select count(1) from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT()])\n" +
+        "    SolrProject(DUMMY=[0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {5L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Can't currently handle count(FIELD) queries")
+  @Test
+  public void testSelectCountSingleField() throws Exception {
+    String sql = "select count(fielda) from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testAggregates() throws Exception {
+    try(Statement stmt = conn.createStatement()) {
+      String sql;
+
+      sql = "select count(*) from test";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select count(1) from test";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select count(fielda) from test";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select count(distinct fielda) from test";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select sum(distinct fieldc) from test";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select fielda, count(*) from test group by fielda";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select fielda, count(1) from test group by fielda";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select fielda, count(fielda) from test group by fielda";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select fielda, count(fieldb) from test group by fielda";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda, fieldb";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+
+      sql = "select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
+      System.out.println(sql);
+      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println();
+    }
+  }
 
   private String getExplainPlan(Statement stmt, String sql) throws SQLException {
     String explainSQL = "explain plan for " + sql;
@@ -789,7 +906,7 @@ public class SolrAdapterTest {
   }
 
   private void assertResultEquals(List<Object[]> expected, List<Object[]> actual) throws Exception {
-    assertEquals(expected.size(), actual.size());
+    assertEquals("Result is a different size", expected.size(), actual.size());
     for(int i = 0; i < expected.size(); i++) {
       Object[] expectedRow = expected.get(i);
       Object[] actualRow = actual.get(i);

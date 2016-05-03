@@ -30,6 +30,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.util.BuiltInMethod;
+import org.apache.solr.client.solrj.io.stream.metrics.Metric;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,9 +66,10 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
         constantArrayList(generateFields(SolrRules.solrFieldNames(rowType), solrImplementor.fieldMappings), String.class));
     final Expression filterQueries = list.append("query", Expressions.constant(solrImplementor.query, String.class));
     final Expression order = list.append("order", constantArrayList(solrImplementor.order, String.class));
+    final Expression metrics = list.append("metrics", constantArrayList(solrImplementor.metrics, Metric.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
     Expression enumerable = list.append("enumerable", Expressions.call(table, SolrMethod.SOLR_QUERYABLE_QUERY.method,
-        fields, filterQueries, order, limit));
+        fields, filterQueries, order, metrics, limit));
     if (CalcitePrepareImpl.DEBUG) {
       System.out.println("Solr: " + filterQueries);
     }

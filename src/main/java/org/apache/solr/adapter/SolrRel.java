@@ -19,6 +19,7 @@ package org.apache.solr.adapter;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
+import org.apache.solr.client.solrj.io.stream.metrics.Metric;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,29 +41,32 @@ public interface SolrRel extends RelNode {
     String query = null;
     String limitValue = null;
     final List<String> order = new ArrayList<>();
+    final List<Metric> metrics = new ArrayList<>();
 
     RelOptTable table;
     SolrTable solrTable;
 
-    public void addFieldMappings(Map<String, String> fieldMappings) {
-      if (fieldMappings != null) {
-        this.fieldMappings.putAll(fieldMappings);
-      }
+    void addFieldMappings(Map<String, String> fieldMappings) {
+      this.fieldMappings.putAll(fieldMappings);
     }
 
-    public void addQuery(String query) {
+    void addQuery(String query) {
       this.query = query;
     }
 
-    public void addOrder(List<String> newOrder) {
+    void addOrder(List<String> newOrder) {
       order.addAll(newOrder);
     }
 
-    public void setLimit(String limit) {
+    void addMetrics(List<Metric> metrics) {
+      this.metrics.addAll(metrics);
+    }
+
+    void setLimit(String limit) {
       limitValue = limit;
     }
 
-    public void visitChild(int ordinal, RelNode input) {
+    void visitChild(int ordinal, RelNode input) {
       assert ordinal == 0;
       ((SolrRel) input).implement(this);
     }

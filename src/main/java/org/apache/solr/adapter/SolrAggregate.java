@@ -1,91 +1,89 @@
-///*
-// * Licensed to the Apache Software Foundation (ASF) under one or more
-// * contributor license agreements.  See the NOTICE file distributed with
-// * this work for additional information regarding copyright ownership.
-// * The ASF licenses this file to You under the Apache License, Version 2.0
-// * (the "License"); you may not use this file except in compliance with
-// * the License.  You may obtain a copy of the License at
-// *
-// *     http://www.apache.org/licenses/LICENSE-2.0
-// *
-// * Unless required by applicable law or agreed to in writing, software
-// * distributed under the License is distributed on an "AS IS" BASIS,
-// * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// * See the License for the specific language governing permissions and
-// * limitations under the License.
-// */
-//package org.apache.solr.adapter;
-//
-//import org.apache.calcite.plan.RelOptCluster;
-//import org.apache.calcite.plan.RelTraitSet;
-//import org.apache.calcite.rel.InvalidRelException;
-//import org.apache.calcite.rel.RelNode;
-//import org.apache.calcite.rel.core.Aggregate;
-//import org.apache.calcite.rel.core.AggregateCall;
-//import org.apache.calcite.sql.SqlAggFunction;
-//import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-//import org.apache.calcite.util.ImmutableBitSet;
-//import org.apache.calcite.util.Util;
-//
-//import java.util.AbstractList;
-//import java.util.ArrayList;
-//import java.util.List;
-//
-///**
-// * Implementation of {@link org.apache.calcite.rel.core.Aggregate} relational expression in Solr.
-// */
-//public class SolrAggregate extends Aggregate implements SolrRel {
-//  public SolrAggregate(
-//      RelOptCluster cluster,
-//      RelTraitSet traitSet,
-//      RelNode child,
-//      boolean indicator,
-//      ImmutableBitSet groupSet,
-//      List<ImmutableBitSet> groupSets,
-//      List<AggregateCall> aggCalls)
-//      throws InvalidRelException {
-//    super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
-//    assert getConvention() == SolrRel.CONVENTION;
-//    assert getConvention() == child.getConvention();
-//
-//    for (AggregateCall aggCall : aggCalls) {
-//      if (aggCall.isDistinct()) {
-//        throw new InvalidRelException("distinct aggregation not supported");
-//      }
-//    }
-//    switch (getGroupType()) {
-//      case SIMPLE:
-//        break;
-//      default:
-//        throw new InvalidRelException("unsupported group type: " + getGroupType());
-//    }
-//  }
-//
-//  @Override
-//  public Aggregate copy(RelTraitSet traitSet, RelNode input,
-//                        boolean indicator, ImmutableBitSet groupSet,
-//                        List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-//    try {
-//      return new SolrAggregate(getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls);
-//    } catch (InvalidRelException e) {
-//      // Semantic error not possible. Must be a bug. Convert to
-//      // internal error.
-//      throw new AssertionError(e);
-//    }
-//  }
-//
-//  public void implement(Implementor implementor) {
-//    implementor.visitChild(0, getInput());
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.solr.adapter;
+
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.InvalidRelException;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.calcite.util.Util;
+import org.apache.solr.client.solrj.io.stream.metrics.*;
+
+import java.util.*;
+
+/**
+ * Implementation of {@link org.apache.calcite.rel.core.Aggregate} relational expression in Solr.
+ */
+public class SolrAggregate extends Aggregate implements SolrRel {
+  public SolrAggregate(
+      RelOptCluster cluster,
+      RelTraitSet traitSet,
+      RelNode child,
+      boolean indicator,
+      ImmutableBitSet groupSet,
+      List<ImmutableBitSet> groupSets,
+      List<AggregateCall> aggCalls)
+      throws InvalidRelException {
+    super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
+    assert getConvention() == SolrRel.CONVENTION;
+    assert getConvention() == child.getConvention();
+  }
+
+  @Override
+  public Aggregate copy(RelTraitSet traitSet, RelNode input,
+                        boolean indicator, ImmutableBitSet groupSet,
+                        List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
+    try {
+      return new SolrAggregate(getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls);
+    } catch (InvalidRelException e) {
+      // Semantic error not possible. Must be a bug. Convert to
+      // internal error.
+      throw new AssertionError(e);
+    }
+  }
+
+  public void implement(Implementor implementor) {
+    implementor.visitChild(0, getInput());
+
+    final List<String> inNames = SolrRules.solrFieldNames(getInput().getRowType());
+    final List<String> outNames = SolrRules.solrFieldNames(getRowType());
+
+    List<Metric> metrics = new ArrayList<>();
+    Map<String, String> fieldMappings = new HashMap<>();
+    for(AggregateCall aggCall : aggCalls) {
+      Metric metric = toSolrMetric(aggCall.getAggregation(), inNames, aggCall.getArgList());
+      metrics.add(metric);
+      fieldMappings.put(aggCall.getName(), metric.getIdentifier());
+    }
+    implementor.addMetrics(metrics);
+    implementor.addFieldMappings(fieldMappings);
 //    List<String> list = new ArrayList<>();
-//    final List<String> inNames = SolrRules.solrFieldNames(getInput().getRowType());
-//    final List<String> outNames = SolrRules.solrFieldNames(getRowType());
 //    int i = 0;
 //    if (groupSet.cardinality() == 1) {
 //      final String inName = inNames.get(groupSet.nth(0));
 //      list.add("_id: " + SolrRules.maybeQuote("$" + inName));
 //      ++i;
 //    } else {
-//      List<String> keys = new ArrayList<String>();
+//      List<String> keys = new ArrayList<>();
 //      for (int group : groupSet) {
 //        final String inName = inNames.get(group);
 //        keys.add(inName + ": " + SolrRules.quote("$" + inName));
@@ -127,37 +125,29 @@
 //    if (!groupSet.isEmpty()) {
 //      implementor.add(null, "{$project: " + Util.toString(fixups, "{", ", ", "}") + "}");
 //    }
-//  }
-//
-//  private String toSolr(SqlAggFunction aggregation, List<String> inNames, List<Integer> args) {
-//    if (aggregation == SqlStdOperatorTable.COUNT) {
-//      if (args.size() == 0) {
-//        return "{$sum: 1}";
-//      } else {
-//        assert args.size() == 1;
-//        final String inName = inNames.get(args.get(0));
-//        return "{$sum: {$cond: [ {$eq: [" + SolrRules.quote(inName) + ", null]}, 0, 1]}}";
-//      }
-//    } else if (aggregation == SqlStdOperatorTable.SUM || aggregation == SqlStdOperatorTable.SUM0) {
-//      assert args.size() == 1;
-//      final String inName = inNames.get(args.get(0));
-//      return "{$sum: " + SolrRules.maybeQuote("$" + inName) + "}";
-//    } else if (aggregation == SqlStdOperatorTable.MIN) {
-//      assert args.size() == 1;
-//      final String inName = inNames.get(args.get(0));
-//      return "{$min: " + SolrRules.maybeQuote("$" + inName) + "}";
-//    } else if (aggregation == SqlStdOperatorTable.MAX) {
-//      assert args.size() == 1;
-//      final String inName = inNames.get(args.get(0));
-//      return "{$max: " + SolrRules.maybeQuote("$" + inName) + "}";
-//    } else if (aggregation == SqlStdOperatorTable.AVG) {
-//      assert args.size() == 1;
-//      final String inName = inNames.get(args.get(0));
-//      return "{$avg: " + SolrRules.maybeQuote("$" + inName) + "}";
-//    } else {
-//      throw new AssertionError("unknown aggregate " + aggregation);
-//    }
-//  }
-//}
-//
-//// End SolrAggregate.java
+  }
+
+  private Metric toSolrMetric(SqlAggFunction aggregation, List<String> inNames, List<Integer> args) {
+    switch (args.size()) {
+      case 0:
+        if(aggregation.equals(SqlStdOperatorTable.COUNT)) {
+          return new CountMetric();
+        }
+      case 1:
+        final String inName = inNames.get(args.get(0));
+        if (aggregation.equals(SqlStdOperatorTable.SUM) || aggregation.equals(SqlStdOperatorTable.SUM0)) {
+          return new SumMetric(inName);
+        } else if (aggregation.equals(SqlStdOperatorTable.MIN)) {
+          return new MinMetric(inName);
+        } else if (aggregation.equals(SqlStdOperatorTable.MAX)) {
+          return new MaxMetric(inName);
+        } else if (aggregation.equals(SqlStdOperatorTable.AVG)) {
+          return new MeanMetric(inName);
+        }
+      default:
+        throw new AssertionError("Invalid aggregation " + aggregation + " with args " + args + " with names" + inNames);
+    }
+  }
+}
+
+// End SolrAggregate.java
