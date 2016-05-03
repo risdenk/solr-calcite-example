@@ -1,0 +1,9 @@
+language: java
+
+jdk:
+  - oraclejdk8
+
+script: mvn test -q
+
+# Use the Container based infrastructure.
+sudo: false
