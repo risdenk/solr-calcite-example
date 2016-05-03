@@ -879,13 +879,14 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("WIP")
+  @Ignore
   @Test
-  public void testSelectSingleFieldAggregatesGroupBySingleField() throws Exception {
-    String sql = "select fielda, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda";
+  public void testSelectSingleFieldAggregates() throws Exception {
+    String sql = "select min(fieldc) from test";
     String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrAggregate(group=[{0}], EXPR$1=[MIN($4)], EXPR$2=[MAX($4)], EXPR$3=[AVG($4)], EXPR$4=[SUM($4)])\n" +
-        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+        "  SolrAggregate(group=[{}], EXPR$0=[MIN($0)])\n" +
+        "    SolrProject(fieldc=[$4])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
 

@@ -35,9 +35,9 @@ import java.util.Map;
 /**
  * Implementation of {@link org.apache.calcite.rel.core.Project} relational expression in Solr.
  */
-public class SolrProject extends Project implements SolrRel {
-  public SolrProject(RelOptCluster cluster, RelTraitSet traitSet,
-                     RelNode input, List<? extends RexNode> projects, RelDataType rowType) {
+class SolrProject extends Project implements SolrRel {
+  SolrProject(RelOptCluster cluster, RelTraitSet traitSet,
+              RelNode input, List<? extends RexNode> projects, RelDataType rowType) {
     super(cluster, traitSet, input, projects, rowType);
     assert getConvention() == SolrRel.CONVENTION;
     assert getConvention() == input.getConvention();

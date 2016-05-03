@@ -41,7 +41,7 @@ import java.util.*;
 /**
  * Table based on a Solr collection
  */
-public class SolrTable extends AbstractQueryableTable implements TranslatableTable {
+class SolrTable extends AbstractQueryableTable implements TranslatableTable {
   private static final String DEFAULT_QUERY = "*:*";
   private static final String DEFAULT_VERSION_FIELD = "_version_";
   private static final String DEFAULT_SCORE_FIELD = "score";
@@ -50,7 +50,7 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
   private final SolrSchema schema;
   private RelProtoDataType protoRowType;
 
-  public SolrTable(SolrSchema schema, String collection) {
+  SolrTable(SolrSchema schema, String collection) {
     super(Object[].class);
     this.schema = schema;
     this.collection = collection;
@@ -67,7 +67,7 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
     return protoRowType.apply(typeFactory);
   }
   
-  public Enumerable<Object> query(final Properties properties) {
+  private Enumerable<Object> query(final Properties properties) {
     return query(properties, Collections.emptyList(), null, Collections.emptyList(), Collections.emptyList(),
         Collections.emptyList(), null);
   }
@@ -79,9 +79,9 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
    * @param query A string for the query
    * @return Enumerator of results
    */
-  public Enumerable<Object> query(final Properties properties, final List<String> fields,
-                                  final String query, final List<String> order, final List<String> buckets,
-                                  final List<Metric> metrics, final String limit) {
+  private Enumerable<Object> query(final Properties properties, final List<String> fields,
+                                   final String query, final List<String> order, final List<String> buckets,
+                                   final List<Metric> metrics, final String limit) {
     // SolrParams should be a ModifiableParams instead of a map
     Map<String, String> solrParams = new HashMap<>();
     solrParams.put(CommonParams.OMIT_HEADER, "true");
@@ -176,6 +176,7 @@ public class SolrTable extends AbstractQueryableTable implements TranslatableTab
     return new SolrTableScan(cluster, cluster.traitSetOf(SolrRel.CONVENTION), relOptTable, this, null);
   }
 
+  @SuppressWarnings("WeakerAccess")
   public static class SolrQueryable<T> extends AbstractTableQueryable<T> {
     SolrQueryable(QueryProvider queryProvider, SchemaPlus schema, SolrTable table, String tableName) {
       super(queryProvider, schema, table, tableName);

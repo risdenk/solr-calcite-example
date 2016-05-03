@@ -32,8 +32,8 @@ import java.util.*;
 /**
  * Implementation of {@link org.apache.calcite.rel.core.Aggregate} relational expression in Solr.
  */
-public class SolrAggregate extends Aggregate implements SolrRel {
-  public SolrAggregate(
+class SolrAggregate extends Aggregate implements SolrRel {
+  SolrAggregate(
       RelOptCluster cluster,
       RelTraitSet traitSet,
       RelNode child,

@@ -32,8 +32,8 @@ import java.util.List;
 /**
  * Implementation of a {@link org.apache.calcite.rel.core.Filter} relational expression in Solr.
  */
-public class SolrFilter extends Filter implements SolrRel {
-  public SolrFilter(
+class SolrFilter extends Filter implements SolrRel {
+  SolrFilter(
       RelOptCluster cluster,
       RelTraitSet traitSet,
       RelNode child,
