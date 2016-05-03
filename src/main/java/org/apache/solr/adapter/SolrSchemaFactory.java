@@ -21,6 +21,7 @@ import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
 
 import java.util.Map;
+import java.util.Properties;
 
 @SuppressWarnings("UnusedDeclaration")
 public class SolrSchemaFactory implements SchemaFactory {
@@ -28,7 +29,11 @@ public class SolrSchemaFactory implements SchemaFactory {
   }
 
   public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
-    final String zk = (String) operand.get("zk");
-    return new SolrSchema(zk);
+    Properties properties = new Properties();
+    for(Map.Entry<String, Object> entry : operand.entrySet()) {
+      properties.setProperty(entry.getKey(), String.valueOf(entry.getValue()));
+    }
+
+    return new SolrSchema(properties);
   }
 }

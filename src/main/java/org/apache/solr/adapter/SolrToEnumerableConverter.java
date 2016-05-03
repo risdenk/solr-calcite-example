@@ -2,11 +2,11 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to you under the Apache License, Version 2.0
+ * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,23 +43,6 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
     super(cluster, ConventionTraitDef.INSTANCE, traits, input);
   }
 
-  /**
-   * E.g. {@code constantArrayList("x", "y")} returns
-   * "Arrays.asList('x', 'y')".
-   */
-  private static <T> MethodCallExpression constantArrayList(List<T> values, Class clazz) {
-    return Expressions.call(BuiltInMethod.ARRAYS_AS_LIST.method,
-        Expressions.newArrayInit(clazz, constantList(values)));
-  }
-
-  /**
-   * E.g. {@code constantList("x", "y")} returns
-   * {@code {ConstantExpression("x"), ConstantExpression("y")}}.
-   */
-  private static <T> List<Expression> constantList(List<T> values) {
-    return Lists.transform(values, Expressions::constant);
-  }
-
   @Override
   public RelNode copy(RelTraitSet traitSet, List<RelNode> inputs) {
     return new SolrToEnumerableConverter(getCluster(), traitSet, sole(inputs));
@@ -80,7 +63,7 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
     final Expression table = list.append("table", solrImplementor.table.getExpression(SolrTable.SolrQueryable.class));
     final Expression fields = list.append("fields",
         constantArrayList(generateFields(SolrRules.solrFieldNames(rowType), solrImplementor.fieldMappings), String.class));
-    final Expression filterQueries = list.append("filterQueries", constantArrayList(solrImplementor.filterQueries, String.class));
+    final Expression filterQueries = list.append("query", Expressions.constant(solrImplementor.query, String.class));
     final Expression order = list.append("order", constantArrayList(solrImplementor.order, String.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
     Expression enumerable = list.append("enumerable", Expressions.call(table, SolrMethod.SOLR_QUERYABLE_QUERY.method,
@@ -94,14 +77,31 @@ public class SolrToEnumerableConverter extends ConverterImpl implements Enumerab
   }
 
   private List<String> generateFields(List<String> queryFields, Map<String, String> fieldMappings) {
-    if (fieldMappings.isEmpty()) {
+    if(fieldMappings.isEmpty()) {
       return queryFields;
     } else {
       List<String> fields = new ArrayList<>();
-      for (String field : queryFields) {
+      for(String field : queryFields) {
         fields.add(fieldMappings.getOrDefault(field, field));
       }
       return fields;
     }
+  }
+
+  /**
+   * E.g. {@code constantArrayList("x", "y")} returns
+   * "Arrays.asList('x', 'y')".
+   */
+  private static <T> MethodCallExpression constantArrayList(List<T> values, Class clazz) {
+    return Expressions.call(BuiltInMethod.ARRAYS_AS_LIST.method,
+        Expressions.newArrayInit(clazz, constantList(values)));
+  }
+
+  /**
+   * E.g. {@code constantList("x", "y")} returns
+   * {@code {ConstantExpression("x"), ConstantExpression("y")}}.
+   */
+  private static <T> List<Expression> constantList(List<T> values) {
+    return Lists.transform(values, Expressions::constant);
   }
 }

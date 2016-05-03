@@ -2,11 +2,11 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to you under the Apache License, Version 2.0
+ * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,38 +30,45 @@ import org.apache.solr.common.luke.FieldFlag;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 class SolrSchema extends AbstractSchema {
-  final CloudSolrClient cloudSolrClient;
+  final Properties properties;
 
-  SolrSchema(String zk) {
+  SolrSchema(Properties properties) {
     super();
-    this.cloudSolrClient = new CloudSolrClient(zk);
-    this.cloudSolrClient.connect();
+    this.properties = properties;
   }
 
   @Override
   protected Map<String, Table> getTableMap() {
-    this.cloudSolrClient.connect();
-    Set<String> collections = this.cloudSolrClient.getZkStateReader().getClusterState().getCollections();
-    final ImmutableMap.Builder<String, Table> builder = ImmutableMap.builder();
-    for (String collection : collections) {
-      builder.put(collection, new SolrTable(this, collection));
+    String zk = this.properties.getProperty("zk");
+    try(CloudSolrClient cloudSolrClient = new CloudSolrClient(zk)) {
+      cloudSolrClient.connect();
+      Set<String> collections = cloudSolrClient.getZkStateReader().getClusterState().getCollections();
+
+      final ImmutableMap.Builder<String, Table> builder = ImmutableMap.builder();
+      for (String collection : collections) {
+        builder.put(collection, new SolrTable(this, collection));
+      }
+      return builder.build();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    return builder.build();
   }
 
   private Map<String, LukeResponse.FieldInfo> getFieldInfo(String collection) {
-    LukeRequest lukeRequest = new LukeRequest();
-    lukeRequest.setNumTerms(0);
-    LukeResponse lukeResponse;
-    try {
-      lukeResponse = lukeRequest.process(cloudSolrClient, collection);
+    String zk = this.properties.getProperty("zk");
+    try(CloudSolrClient cloudSolrClient = new CloudSolrClient(zk)) {
+      cloudSolrClient.connect();
+      LukeRequest lukeRequest = new LukeRequest();
+      lukeRequest.setNumTerms(0);
+      LukeResponse lukeResponse = lukeRequest.process(cloudSolrClient, collection);
+      return lukeResponse.getFieldInfo();
     } catch (SolrServerException | IOException e) {
       throw new RuntimeException(e);
     }
-    return lukeResponse.getFieldInfo();
   }
 
   RelProtoDataType getRelDataType(String collection) {
@@ -71,7 +78,7 @@ class SolrSchema extends AbstractSchema {
     final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
     final RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
     Map<String, LukeResponse.FieldInfo> luceneFieldInfoMap = getFieldInfo(collection);
-    for (Map.Entry<String, LukeResponse.FieldInfo> entry : luceneFieldInfoMap.entrySet()) {
+    for(Map.Entry<String, LukeResponse.FieldInfo> entry : luceneFieldInfoMap.entrySet()) {
       LukeResponse.FieldInfo luceneFieldInfo = entry.getValue();
 
       RelDataType type;
@@ -83,12 +90,16 @@ class SolrSchema extends AbstractSchema {
         case "long":
           type = typeFactory.createJavaType(Long.class);
           break;
+        case "float":
+        case "double":
+          type = typeFactory.createJavaType(Double.class);
+          break;
         default:
           type = typeFactory.createJavaType(String.class);
       }
 
       EnumSet<FieldFlag> flags = luceneFieldInfo.getFlags();
-      if (flags != null && flags.contains(FieldFlag.MULTI_VALUED)) {
+      if(flags != null && flags.contains(FieldFlag.MULTI_VALUED)) {
         type = typeFactory.createArrayType(type, -1);
       }
 

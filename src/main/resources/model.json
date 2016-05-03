@@ -25,7 +25,8 @@
       "type": "custom",
       "factory": "org.apache.solr.adapter.SolrSchemaFactory",
       "operand": {
-        "zk": "localhost:9983"
+        "zk": "localhost:9983",
+        "lex": "MYSQL"
       }
     }
   ]

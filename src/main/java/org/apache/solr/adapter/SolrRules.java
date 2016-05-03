@@ -2,11 +2,11 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to you under the Apache License, Version 2.0
+ * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,14 +16,14 @@
  */
 package org.apache.solr.adapter;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
@@ -34,6 +34,7 @@ import org.apache.calcite.sql.validate.SqlValidatorUtil;
 
 import java.util.AbstractList;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Rules and relational operators for
@@ -41,14 +42,14 @@ import java.util.List;
  * calling convention.
  */
 public class SolrRules {
-  static final RelOptRule[] RULES = {
-      SolrFilterRule.INSTANCE,
-      SolrProjectRule.INSTANCE,
-//    SolrSortRule.INSTANCE
-  };
+  private SolrRules() {}
 
-  private SolrRules() {
-  }
+  static final RelOptRule[] RULES = {
+    SolrFilterRule.INSTANCE,
+    SolrProjectRule.INSTANCE,
+    SolrSortRule.INSTANCE,
+//    SolrAggregateRule.INSTANCE,
+  };
 
   static List<String> solrFieldNames(final RelDataType rowType) {
     return SqlValidatorUtil.uniquify(
@@ -65,9 +66,15 @@ public class SolrRules {
         });
   }
 
-  /**
-   * Translator from {@link RexNode} to strings in Solr's expression language.
-   */
+  public static String maybeQuote(String s) {
+    return s;
+  }
+
+  public static String quote(String s) {
+    return s;
+  }
+
+  /** Translator from {@link RexNode} to strings in Solr's expression language. */
   static class RexToSolrTranslator extends RexVisitorImpl<String> {
     private final JavaTypeFactory typeFactory;
     private final List<String> inFields;
@@ -84,18 +91,16 @@ public class SolrRules {
     }
   }
 
-  /**
-   * Base class for planner rules that convert a relational expression to Solr calling convention.
-   */
+  /** Base class for planner rules that convert a relational expression to Solr calling convention. */
   abstract static class SolrConverterRule extends ConverterRule {
     final Convention out;
 
     public SolrConverterRule(Class<? extends RelNode> clazz, String description) {
-      this(clazz, Predicates.<RelNode>alwaysTrue(), description);
+      this(clazz, relNode -> true, description);
     }
 
-    public <R extends RelNode> SolrConverterRule(Class<R> clazz, Predicate<? super R> predicate, String description) {
-      super(clazz, predicate, Convention.NONE, SolrRel.CONVENTION, description);
+    public <R extends RelNode> SolrConverterRule(Class<R> clazz, Predicate<RelNode> predicate, String description) {
+      super(clazz, predicate::test, Convention.NONE, SolrRel.CONVENTION, description);
       this.out = SolrRel.CONVENTION;
     }
   }
@@ -122,7 +127,7 @@ public class SolrRules {
   }
 
   /**
-   * Rule to convert a {@link org.apache.calcite.rel.logical.LogicalProject} to a {@link SolrProject}.
+   * Rule to convert a {@link LogicalProject} to a {@link SolrProject}.
    */
   private static class SolrProjectRule extends SolrConverterRule {
     private static final SolrProjectRule INSTANCE = new SolrProjectRule();
@@ -134,116 +139,62 @@ public class SolrRules {
     public RelNode convert(RelNode rel) {
       final LogicalProject project = (LogicalProject) rel;
       final RelTraitSet traitSet = project.getTraitSet().replace(out);
-      return new SolrProject(project.getCluster(), traitSet,
-          convert(project.getInput(), out), project.getProjects(), project.getRowType());
+      return new SolrProject(
+          rel.getCluster(),
+          traitSet,
+          convert(project.getInput(), out),
+          project.getProjects(),
+          project.getRowType());
     }
   }
 
   /**
-   * Rule to convert a {@link org.apache.calcite.rel.core.Sort} to a {@link SolrSort}.
+   * Rule to convert a {@link Sort} to a {@link SolrSort}.
    */
-//  private static class SolrSortRule extends RelOptRule {
-//    private static final com.google.common.base.Predicate<Sort> SORT_PREDICATE =
-//            input -> {
-//              // CQL has no support for offsets
-//              return input.offset == null;
-//            };
-//    private static final com.google.common.base.Predicate<SolrFilter> FILTER_PREDICATE =
-//            input -> {
-//              // We can only use implicit sorting within a single partition
-//              return input.isSinglePartition();
-//            };
-//    private static final RelOptRuleOperand SOLR_OP =
-//        operand(SolrToEnumerableConverter.class,
-//        operand(SolrFilter.class, null, FILTER_PREDICATE, any()));
+  private static class SolrSortRule extends SolrConverterRule {
+    public static final SolrSortRule INSTANCE = new SolrSortRule();
+
+    private SolrSortRule() {
+      super(Sort.class, "SolrSortRule");
+    }
+
+    public RelNode convert(RelNode rel) {
+      final Sort sort = (Sort) rel;
+      final RelTraitSet traitSet = sort.getTraitSet().replace(out).replace(sort.getCollation());
+      return new SolrSort(
+          rel.getCluster(),
+          traitSet,
+          convert(sort.getInput(), traitSet.replace(RelCollations.EMPTY)),
+          sort.getCollation(),
+          sort.fetch);
+    }
+  }
+
+//  /**
+//   * Rule to convert an {@link org.apache.calcite.rel.logical.LogicalAggregate} to an {@link SolrAggregate}.
+//   */
+//  private static class SolrAggregateRule extends SolrConverterRule {
+//    public static final RelOptRule INSTANCE = new SolrAggregateRule();
 //
-//    private static final SolrSortRule INSTANCE = new SolrSortRule();
-//
-//    private SolrSortRule() {
-//      super(operand(Sort.class, null, SORT_PREDICATE, SOLR_OP), "SolrSortRule");
+//    private SolrAggregateRule() {
+//      super(LogicalAggregate.class, "SolrAggregateRule");
 //    }
 //
-//    public RelNode convert(Sort sort, SolrFilter filter) {
-//      final RelTraitSet traitSet =
-//          sort.getTraitSet().replace(SolrRel.CONVENTION)
-//              .replace(sort.getCollation());
-//      return new SolrSort(sort.getCluster(), traitSet,
-//          convert(sort.getInput(), traitSet.replace(RelCollations.EMPTY)),
-//          sort.getCollation(), filter.getImplicitCollation(), sort.fetch);
-//    }
-//
-//    public boolean matches(RelOptRuleCall call) {
-//      final Sort sort = call.rel(0);
-//      final SolrFilter filter = call.rel(2);
-//      return collationsCompatible(sort.getCollation(), filter.getImplicitCollation());
-//    }
-//
-//    /** Check if it is possible to exploit native CQL sorting for a given collation.
-//     *
-//     * @return True if it is possible to achieve this sort in Solr
-//     */
-//    private boolean collationsCompatible(RelCollation sortCollation, RelCollation implicitCollation) {
-//      List<RelFieldCollation> sortFieldCollations = sortCollation.getFieldCollations();
-//      List<RelFieldCollation> implicitFieldCollations = implicitCollation.getFieldCollations();
-//
-//      if (sortFieldCollations.size() > implicitFieldCollations.size()) {
-//        return false;
-//      }
-//      if (sortFieldCollations.size() == 0) {
-//        return true;
-//      }
-//
-//      // Check if we need to reverse the order of the implicit collation
-//      boolean reversed = reverseDirection(sortFieldCollations.get(0).getDirection())
-//          == implicitFieldCollations.get(0).getDirection();
-//
-//      for (int i = 0; i < sortFieldCollations.size(); i++) {
-//        RelFieldCollation sorted = sortFieldCollations.get(i);
-//        RelFieldCollation implied = implicitFieldCollations.get(i);
-//
-//        // Check that the fields being sorted match
-//        if (sorted.getFieldIndex() != implied.getFieldIndex()) {
-//          return false;
-//        }
-//
-//        // Either all fields must be sorted in the same direction
-//        // or the opposite direction based on whether we decided
-//        // if the sort direction should be reversed above
-//        RelFieldCollation.Direction sortDirection = sorted.getDirection();
-//        RelFieldCollation.Direction implicitDirection = implied.getDirection();
-//        if ((!reversed && sortDirection != implicitDirection)
-//                || (reversed && reverseDirection(sortDirection) != implicitDirection)) {
-//          return false;
-//        }
-//      }
-//
-//      return true;
-//    }
-//
-//    /** Find the reverse of a given collation direction.
-//     *
-//     * @return Reverse of the input direction
-//     */
-//    private RelFieldCollation.Direction reverseDirection(RelFieldCollation.Direction direction) {
-//      switch(direction) {
-//      case ASCENDING:
-//      case STRICTLY_ASCENDING:
-//        return RelFieldCollation.Direction.DESCENDING;
-//      case DESCENDING:
-//      case STRICTLY_DESCENDING:
-//        return RelFieldCollation.Direction.ASCENDING;
-//      default:
+//    public RelNode convert(RelNode rel) {
+//      final LogicalAggregate agg = (LogicalAggregate) rel;
+//      final RelTraitSet traitSet = agg.getTraitSet().replace(out);
+//      try {
+//        return new SolrAggregate(
+//            rel.getCluster(),
+//            traitSet,
+//            convert(agg.getInput(), traitSet.simplify()),
+//            agg.indicator,
+//            agg.getGroupSet(),
+//            agg.getGroupSets(),
+//            agg.getAggCallList());
+//      } catch (InvalidRelException e) {
+//        LOGGER.warn(e.toString());
 //        return null;
-//      }
-//    }
-//
-//    /** @see org.apache.calcite.rel.convert.ConverterRule */
-//    public void onMatch(RelOptRuleCall call) {
-//      final Sort sort = call.rel(0);
-//      SolrFilter filter = call.rel(2);
-//      final RelNode converted = convert(sort, filter);
-//      if (converted != null) {
-//        call.transformTo(converted);
 //      }
 //    }
 //  }
