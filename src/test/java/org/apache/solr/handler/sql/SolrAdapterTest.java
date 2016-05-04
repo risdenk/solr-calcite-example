@@ -771,6 +771,25 @@ public class SolrAdapterTest {
   }
 
   @Test
+  public void testSelectMultipleFieldsAliasWhereMultipleOrderByLimit() throws Exception {
+    String sql = "select fielda as abc, fieldb as def, fieldc, fieldd_s, fielde_i from test " +
+        "where fielda = 'a1' and fieldb = 'b1' order by def limit 2";
+
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrSort(sort0=[$1], dir0=[ASC], fetch=[2])\n" +
+        "    SolrProject(abc=[$0], def=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
+        "      SolrFilter(condition=[AND(" +
+        "=(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1'), " +
+        "=(CAST($5):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'b1'))])\n" +
+        "        SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
   public void testSelectCountStar() throws Exception {
     String sql = "select count(*) from test";
     String explainPlan = "SolrToEnumerableConverter\n" +

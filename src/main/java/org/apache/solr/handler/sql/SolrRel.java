@@ -55,8 +55,13 @@ interface SolrRel extends RelNode {
       this.query = query;
     }
 
-    void addOrder(List<String> newOrder) {
-      order.addAll(newOrder);
+    void addOrder(List<String> order) {
+      for(String orderItem : order) {
+        String[] orderParts = orderItem.split(" ", 2);
+        String fieldName = orderParts[0];
+        String direction = orderParts[1];
+       this.order.add(this.fieldMappings.getOrDefault(fieldName, fieldName) + " " + direction);
+      }
     }
 
     void addBuckets(List<String> buckets) {
