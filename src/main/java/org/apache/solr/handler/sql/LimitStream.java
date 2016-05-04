@@ -20,6 +20,9 @@ import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.comp.StreamComparator;
 import org.apache.solr.client.solrj.io.stream.StreamContext;
 import org.apache.solr.client.solrj.io.stream.TupleStream;
+import org.apache.solr.client.solrj.io.stream.expr.Explanation;
+import org.apache.solr.client.solrj.io.stream.expr.StreamExplanation;
+import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,6 +61,19 @@ class LimitStream extends TupleStream {
 
   public void setStreamContext(StreamContext context) {
     stream.setStreamContext(context);
+  }
+
+  @Override
+  public Explanation toExplanation(StreamFactory factory) throws IOException {
+
+    return new StreamExplanation(getStreamNodeId().toString())
+        .withChildren(new Explanation[]{
+            stream.toExplanation(factory)
+        })
+        .withFunctionName("SQL LIMIT")
+        .withExpression("--non-expressible--")
+        .withImplementingClass(this.getClass().getName())
+        .withExpressionType(Explanation.ExpressionType.STREAM_DECORATOR);
   }
 
   public Tuple read() throws IOException {

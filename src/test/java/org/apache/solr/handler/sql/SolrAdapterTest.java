@@ -831,7 +831,6 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Broken because CountMetric returns a double instead of a long")
   @Test
   public void testSelectSingleFieldCountStarGroupBySingleField() throws Exception {
     String sql = "select fielda, count(*) from test group by fielda";
@@ -840,11 +839,12 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
 
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Broken because CountMetric returns a double instead of a long")
   @Test
   public void testSelectSingleFieldCountOneGroupBySingleField() throws Exception {
     String sql = "select fielda, count(1) from test group by fielda";
@@ -853,6 +853,8 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -885,7 +887,6 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Broken because CountMetric returns a double instead of a long")
   @Test
   public void testSelectSingleFieldCountStarGroupByMultipleFields() throws Exception {
     String sql = "select fielda, fieldb, count(*) from test group by fielda, fieldb";
