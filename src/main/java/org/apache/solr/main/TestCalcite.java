@@ -24,7 +24,7 @@ class TestCalcite {
     } catch (ClassNotFoundException e) {
       throw new IOException(e);
     }
-    try (Connection conn = DriverManager.getConnection("jdbc:calcitesolr:", info)) {
+    try (Connection conn = DriverManager.getConnection(CalciteSolrDriver.CONNECT_STRING_PREFIX, info)) {
       try (Statement stmt = conn.createStatement()) {
         printExplain(stmt, sql);
         printResult(stmt, sql);

@@ -6,6 +6,7 @@ import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.update.VersionInfo;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -1069,7 +1070,7 @@ public class SolrAdapterTest {
         Object[] row = new Object[rsMetaData.getColumnCount()];
         for (int i = 0; i < rsMetaData.getColumnCount(); i++) {
           // Force _version_ to be null since can't check it
-          if("_version_".equals(rsMetaData.getColumnName(i+1))) {
+          if(VersionInfo.VERSION_FIELD.equals(rsMetaData.getColumnName(i+1))) {
             row[i] = null;
           } else {
             row[i] = rs.getObject(i+1);
