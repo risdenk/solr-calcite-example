@@ -18,7 +18,7 @@ class TestCalcite {
     info.setProperty("lex", Lex.MYSQL.toString());
     info.setProperty("zk", zk);
 
-    String driverClass = CalciteSolrDriver.class.getCanonicalName();
+    String driverClass = CalciteSolrDriver.class.getName();
     try {
       Class.forName(driverClass);
     } catch (ClassNotFoundException e) {

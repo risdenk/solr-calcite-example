@@ -76,7 +76,7 @@ public class SolrAdapterTest {
   }
 
   private static void setupConnection() throws Exception {
-    String driverClass = CalciteSolrDriver.class.getCanonicalName();
+    String driverClass = CalciteSolrDriver.class.getName();
     try {
       Class.forName(driverClass);
     } catch (ClassNotFoundException e) {
