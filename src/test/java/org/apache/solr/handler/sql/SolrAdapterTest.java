@@ -817,7 +817,6 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Can't currently handle count(FIELD) queries")
   @Test
   public void testSelectCountField() throws Exception {
     String sql = "select count(fielda) from test";
@@ -827,6 +826,7 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{5L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -837,6 +837,37 @@ public class SolrAdapterTest {
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbySingleField() throws Exception {
+    String sql = "select fielda, count(*) from test group by fielda order by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrSort(sort0=[$0], dir0=[ASC])\n" +
+        "    SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a1", 3L});
+    result.add(new Object[]{"a2", 2L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Fields in the sort spec must be included in the field list")
+  @Test
+  public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbyCountStar() throws Exception {
+    String sql = "select fielda, count(*) from test group by fielda order by count(*)";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrSort(sort0=[$1], dir0=[ASC])\n" +
+        "    SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
     result.add(new Object[]{"a2", 2L});
@@ -859,30 +890,46 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Can't currently handle count(FIELD) queries")
+  @Ignore("Fields in the sort spec must be included in the field list")
   @Test
-  public void testSelectSingleFieldCountFieldGroupBySingleField() throws Exception {
-    String sql = "select fielda, count(fielda) from test group by fielda";
+  public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbyCountOne() throws Exception {
+    String sql = "select fielda, count(1) from test group by fielda order by count(1)";
     String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
-        "    SolrProject(fielda=[$0])\n" +
+        "  SolrSort(sort0=[$1], dir0=[ASC])\n" +
+        "    SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
 
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Can't currently handle count(FIELD) queries")
+  @Test
+  public void testSelectSingleFieldCountFieldGroupBySingleField() throws Exception {
+    String sql = "select fielda, count(fielda) from test group by fielda";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0}], EXPR$1=[COUNT($0)])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
   @Test
   public void testSelectSingleFieldCountDifferentFieldGroupBySingleField() throws Exception {
     String sql = "select fielda, count(fieldb) from test group by fielda";
     String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrAggregate(group=[{}], EXPR$0=[COUNT($0)])\n" +
-        "    SolrProject(fielda=[$0])\n" +
-        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+        "  SolrAggregate(group=[{0}], EXPR$1=[COUNT($5)])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -893,6 +940,24 @@ public class SolrAdapterTest {
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrAggregate(group=[{0, 5}], EXPR$2=[COUNT()])\n" +
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", "b2", 2L});
+    result.add(new Object[]{"a1", "b4", 1L});
+    result.add(new Object[]{"a1", "b3", 1L});
+    result.add(new Object[]{"a1", "b1", 1L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Fields in the sort spec must be included in the field list")
+  @Test
+  public void testSelectSingleFieldCountStarGroupByMultipleFieldsOrderByAggregate() throws Exception {
+    String sql = "select fielda, fieldb, count(*) from test group by fielda, fieldb order by count(*)";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrSort(sort0=[$2], dir0=[ASC])\n" +
+        "    SolrAggregate(group=[{0, 5}], EXPR$2=[COUNT()])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
     result.add(new Object[]{"a2", "b2", 2L});
@@ -973,17 +1038,17 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Test
-  public void testAggregates() throws Exception {
-    try(Statement stmt = conn.createStatement()) {
-      String sql;
-
-      sql = "select fielda from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-    }
-  }
+//  @Test
+//  public void testAggregates() throws Exception {
+//    try(Statement stmt = conn.createStatement()) {
+//      String sql;
+//
+//      sql = "select fielda from test";
+//      System.out.println(sql);
+//      System.out.println(getExplainPlan(stmt, sql));
+//      System.out.println();
+//    }
+//  }
 
   private String getExplainPlan(Statement stmt, String sql) throws SQLException {
     String explainSQL = "explain plan for " + sql;
