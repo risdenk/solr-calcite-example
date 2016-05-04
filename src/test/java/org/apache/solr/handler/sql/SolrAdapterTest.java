@@ -895,6 +895,10 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", "b2", 2L});
+    result.add(new Object[]{"a1", "b4", 1L});
+    result.add(new Object[]{"a1", "b3", 1L});
+    result.add(new Object[]{"a1", "b1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
