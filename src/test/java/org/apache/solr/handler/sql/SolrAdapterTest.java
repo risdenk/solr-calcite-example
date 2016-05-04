@@ -969,7 +969,6 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
   @Test
   public void testSelectSingleFieldAggregates() throws Exception {
     String sql = "select min(fieldc) from test";
@@ -979,11 +978,12 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{1L});
 
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Can't currently handle count(FIELD) queries")
+  @Ignore("Can't currently handle distinct queries")
   @Test
   public void testSelectCountDistinctSingleField() throws Exception {
     String sql = "select count(distinct fielda) from test";
@@ -997,7 +997,7 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
+  @Ignore("Can't currently handle distinct queries")
   @Test
   public void testSelectSumDistinctSingleField() throws Exception {
     String sql = "select sum(distinct fieldc) from test";
@@ -1011,30 +1011,38 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
   @Test
   public void testSelectMultipleAggregationsMultipleGroupBy() throws Exception {
-    String sql = "select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test " +
+    String sql = "select fielda, fieldb, min(fieldc), max(fieldc), avg(cast(fieldc as float)), sum(fieldc) from test " +
         "group by fielda, fieldb";
     String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrAggregate(group=[{0, 5}], EXPR$2=[MIN($4)], EXPR$3=[MAX($4)], EXPR$4=[AVG($4)], EXPR$5=[SUM($4)])\n" +
-        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+        "  SolrAggregate(group=[{0, 1}], EXPR$2=[MIN($2)], EXPR$3=[MAX($2)], EXPR$4=[AVG($3)], EXPR$5=[SUM($2)])\n" +
+        "    SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], $f3=[CAST($4):FLOAT])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", "b2", 0L, 2L, 1.0, 2L});
+    result.add(new Object[]{"a1", "b4", 4L, 4L, 4.0, 4L});
+    result.add(new Object[]{"a1", "b3", 3L, 3L, 3.0, 3L});
+    result.add(new Object[]{"a1", "b1", 1L, 1L, 1.0, 1L});
 
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
   @Test
   public void testSelectMultipleAggregationsAliasesMultipleGroupBy() throws Exception {
     String sql = "select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, " +
-        "avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
+        "avg(cast(fieldc as float)) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
     String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrAggregate(group=[{0, 5}], min=[MIN($4)], max=[MAX($4)], avg=[AVG($4)], sum=[SUM($4)])\n" +
-        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+        "  SolrAggregate(group=[{0, 1}], min=[MIN($2)], max=[MAX($2)], avg=[AVG($3)], sum=[SUM($2)])\n" +
+        "    SolrProject(abc=[$0], def=[$5], fieldc=[$4], $f3=[CAST($4):FLOAT])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", "b2", 0L, 2L, 1.0, 2L});
+    result.add(new Object[]{"a1", "b4", 4L, 4L, 4.0, 4L});
+    result.add(new Object[]{"a1", "b3", 3L, 3L, 3.0, 3L});
+    result.add(new Object[]{"a1", "b1", 1L, 1L, 1.0, 1L});
 
     checkQuery(sql, explainPlan, result);
   }
