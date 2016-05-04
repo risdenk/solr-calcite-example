@@ -951,7 +951,7 @@ public class SolrAdapterTest {
     }
   }
 
-  private void assertResultEquals(List<Object[]> expected, List<Object[]> actual) throws Exception {
+  private void assertResultEquals(List<Object[]> expected, List<Object[]> actual) {
     assertEquals("Result is a different size", expected.size(), actual.size());
     for(int i = 0; i < expected.size(); i++) {
       Object[] expectedRow = expected.get(i);

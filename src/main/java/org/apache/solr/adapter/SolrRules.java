@@ -178,19 +178,14 @@ class SolrRules {
     public RelNode convert(RelNode rel) {
       final LogicalAggregate agg = (LogicalAggregate) rel;
       final RelTraitSet traitSet = agg.getTraitSet().replace(out);
-      try {
-        return new SolrAggregate(
-            rel.getCluster(),
-            traitSet,
-            convert(agg.getInput(), traitSet.simplify()),
-            agg.indicator,
-            agg.getGroupSet(),
-            agg.getGroupSets(),
-            agg.getAggCallList());
-      } catch (InvalidRelException e) {
-        LOGGER.warn(e.toString());
-        return null;
-      }
+      return new SolrAggregate(
+          rel.getCluster(),
+          traitSet,
+          convert(agg.getInput(), traitSet.simplify()),
+          agg.indicator,
+          agg.getGroupSet(),
+          agg.getGroupSets(),
+          agg.getAggCallList());
     }
   }
 }

@@ -40,8 +40,7 @@ class SolrAggregate extends Aggregate implements SolrRel {
       boolean indicator,
       ImmutableBitSet groupSet,
       List<ImmutableBitSet> groupSets,
-      List<AggregateCall> aggCalls)
-      throws InvalidRelException {
+      List<AggregateCall> aggCalls) {
     super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
     assert getConvention() == SolrRel.CONVENTION;
     assert getConvention() == child.getConvention();
@@ -51,13 +50,7 @@ class SolrAggregate extends Aggregate implements SolrRel {
   public Aggregate copy(RelTraitSet traitSet, RelNode input,
                         boolean indicator, ImmutableBitSet groupSet,
                         List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-    try {
-      return new SolrAggregate(getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls);
-    } catch (InvalidRelException e) {
-      // Semantic error not possible. Must be a bug. Convert to
-      // internal error.
-      throw new AssertionError(e);
-    }
+    return new SolrAggregate(getCluster(), traitSet, input, indicator, groupSet, groupSets, aggCalls);
   }
 
   public void implement(Implementor implementor) {

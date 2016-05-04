@@ -31,16 +31,6 @@ enum SolrMethod {
 
   public final Method method;
 
-  public static final ImmutableMap<Method, SolrMethod> MAP;
-
-  static {
-    final ImmutableMap.Builder<Method, SolrMethod> builder = ImmutableMap.builder();
-    for (SolrMethod value : SolrMethod.values()) {
-      builder.put(value.method, value);
-    }
-    MAP = builder.build();
-  }
-
   SolrMethod(Class clazz, String methodName, Class... argumentTypes) {
     this.method = Types.lookupMethod(clazz, methodName, argumentTypes);
   }

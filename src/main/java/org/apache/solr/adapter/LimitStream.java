@@ -29,8 +29,8 @@ import java.util.Map;
 
 class LimitStream extends TupleStream {
 
-  private TupleStream stream;
-  private int limit;
+  private final TupleStream stream;
+  private final int limit;
   private int count;
 
   LimitStream(TupleStream stream, int limit) {

@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-public class TestCalcite {
+class TestCalcite {
   public static void main(String[] args) throws Exception {
     String zk = args[0];
     String sql = args[1];

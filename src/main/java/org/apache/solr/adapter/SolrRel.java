@@ -29,7 +29,7 @@ import java.util.Map;
 /**
  * Relational expression that uses Solr calling convention.
  */
-public interface SolrRel extends RelNode {
+interface SolrRel extends RelNode {
   void implement(Implementor implementor);
 
   /** Calling convention for relational operations that occur in Solr. */
