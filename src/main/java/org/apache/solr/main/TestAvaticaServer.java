@@ -26,14 +26,9 @@ import java.util.List;
 
 public class TestAvaticaServer {
   public static void main(String[] args) throws Exception {
-//    args[0]: the Meta.Factory class name
-//    args[1+]: arguments passed along to Meta.Factory.create(java.util.List)
-    String[] myArgs = new String[]{MyMetaFactory.class.getName()};
-
-    Main.main(myArgs);
+    Main.main(new String[]{MyMetaFactory.class.getName()});
   }
 
-  @SuppressWarnings("unused")
   public static class MyMetaFactory implements Meta.Factory {
     public MyMetaFactory() {
       super();
