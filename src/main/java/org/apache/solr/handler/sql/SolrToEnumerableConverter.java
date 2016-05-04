@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.adapter;
+package org.apache.solr.handler.sql;
 
 import com.google.common.collect.Lists;
 import org.apache.calcite.adapter.enumerable.*;

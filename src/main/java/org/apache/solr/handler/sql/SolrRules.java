@@ -14,13 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.solr.adapter;
+package org.apache.solr.handler.sql;
 
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
@@ -38,8 +37,6 @@ import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import java.util.AbstractList;
 import java.util.List;
 import java.util.function.Predicate;
-
-import static org.apache.calcite.plan.RelOptPlanner.LOGGER;
 
 /**
  * Rules and relational operators for

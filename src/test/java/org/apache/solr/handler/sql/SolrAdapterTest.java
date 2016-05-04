@@ -1,4 +1,4 @@
-package org.apache.solr.adapter;
+package org.apache.solr.handler.sql;
 
 import org.apache.calcite.config.Lex;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -879,7 +879,7 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore
+  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
   @Test
   public void testSelectSingleFieldAggregates() throws Exception {
     String sql = "select min(fieldc) from test";
@@ -893,27 +893,68 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
+  @Ignore("Can't currently handle count(FIELD) queries")
+  @Test
+  public void testSelectCountDistinctSingleField() throws Exception {
+    String sql = "select count(distinct fielda) from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT(DISTINCT $0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
+  @Test
+  public void testSelectSumDistinctSingleField() throws Exception {
+    String sql = "select sum(distinct fieldc) from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[SUM(DISTINCT $0)])\n" +
+        "    SolrProject(fieldc=[$4])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
+  @Test
+  public void testSelectMultipleAggregationsMultipleGroupBy() throws Exception {
+    String sql = "select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test " +
+        "group by fielda, fieldb";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0, 5}], EXPR$2=[MIN($4)], EXPR$3=[MAX($4)], EXPR$4=[AVG($4)], EXPR$5=[SUM($4)])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Ignore("Fails since Metrics aren't changed to Expressions properly in SolrToEnumerableConverter")
+  @Test
+  public void testSelectMultipleAggregationsAliasesMultipleGroupBy() throws Exception {
+    String sql = "select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, " +
+        "avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{0, 5}], min=[MIN($4)], max=[MAX($4)], avg=[AVG($4)], sum=[SUM($4)])\n" +
+        "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+
+    checkQuery(sql, explainPlan, result);
+  }
+
   @Test
   public void testAggregates() throws Exception {
     try(Statement stmt = conn.createStatement()) {
       String sql;
 
-      sql = "select count(distinct fielda) from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select sum(distinct fieldc) from test";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test group by fielda, fieldb";
-      System.out.println(sql);
-      System.out.println(getExplainPlan(stmt, sql));
-      System.out.println();
-
-      sql = "select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
+      sql = "select fielda from test";
       System.out.println(sql);
       System.out.println(getExplainPlan(stmt, sql));
       System.out.println();

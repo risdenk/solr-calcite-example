@@ -1,7 +1,7 @@
 package org.apache.solr.main;
 
 import org.apache.calcite.config.Lex;
-import org.apache.solr.adapter.CalciteSolrDriver;
+import org.apache.solr.handler.sql.CalciteSolrDriver;
 
 import java.io.IOException;
 import java.sql.*;
