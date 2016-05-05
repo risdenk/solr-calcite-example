@@ -46,10 +46,11 @@ import java.util.function.Predicate;
  */
 class SolrRules {
   static final RelOptRule[] RULES = {
-    SolrFilterRule.INSTANCE,
-    SolrProjectRule.INSTANCE,
-    SolrSortRule.INSTANCE,
-    SolrAggregateRule.INSTANCE,
+      SolrFilterRule.FILTER_RULE,
+      SolrFilterRule.FILTER_PROJECT_RULE,
+      SolrProjectRule.PROJECT_RULE,
+//      SolrSortRule.SORT_RULE,
+//      SolrAggregateRule.AGGREGATE_RULE,
   };
 
   static List<String> solrFieldNames(final RelDataType rowType) {
@@ -116,16 +117,43 @@ class SolrRules {
     }
   }
 
+  abstract static class SolrRule extends RelOptRule {
+    final Convention out;
+
+    <R extends RelNode> SolrRule(RelOptRuleOperand rule, String description) {
+      super(rule, description);
+      this.out = SolrRel.CONVENTION;
+    }
+
+    abstract public RelNode convert(RelNode rel);
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      /** @see ConverterRule */
+      RelNode rel = call.rel(0);
+      if (rel.getTraitSet().contains(Convention.NONE)) {
+        final RelNode converted = convert(rel);
+        if (converted != null) {
+          call.transformTo(converted);
+        }
+      }
+    }
+  }
+
   /**
    * Rule to convert a {@link LogicalFilter} to a {@link SolrFilter}.
    */
-  private static class SolrFilterRule extends RelOptRule {
-    private static final SolrFilterRule INSTANCE = new SolrFilterRule();
-    private Convention out = SolrRel.CONVENTION;
+  private static class SolrFilterRule extends SolrRule {
 
-    private SolrFilterRule() {
-      super(operand(LogicalFilter.class, operand(SolrTableScan.class, none())),
-          "SolrFilterRule");
+    private static final SolrFilterRule FILTER_RULE =
+        new SolrFilterRule(operand(LogicalFilter.class, operand(SolrTableScan.class, none())), "SolrFilterRule");
+
+    private static final SolrFilterRule FILTER_PROJECT_RULE =
+        new SolrFilterRule(operand(LogicalFilter.class, operand(
+            LogicalProject.class, operand(SolrTableScan.class, none()))), "SolrFilterProjectRule");
+
+    <R extends RelNode> SolrFilterRule(RelOptRuleOperand rule, String description) {
+      super(rule, description);
     }
 
     public RelNode convert(RelNode rel) {
@@ -137,25 +165,13 @@ class SolrRules {
           convert(filter.getInput(), out),
           filter.getCondition());
     }
-
-    @Override
-    public void onMatch(RelOptRuleCall call) {
-      /** @see org.apache.calcite.rel.convert.ConverterRule */
-      LogicalFilter filter = call.rel(0);
-      if (filter.getTraitSet().contains(Convention.NONE)) {
-        final RelNode converted = convert(filter);
-        if (converted != null) {
-          call.transformTo(converted);
-        }
-      }
-    }
   }
 
   /**
    * Rule to convert a {@link LogicalProject} to a {@link SolrProject}.
    */
   private static class SolrProjectRule extends SolrConverterRule {
-    private static final SolrProjectRule INSTANCE = new SolrProjectRule();
+    private static final SolrProjectRule PROJECT_RULE = new SolrProjectRule();
 
     private SolrProjectRule() {
       super(LogicalProject.class, "SolrProjectRule");
@@ -176,11 +192,14 @@ class SolrRules {
   /**
    * Rule to convert a {@link Sort} to a {@link SolrSort}.
    */
-  private static class SolrSortRule extends SolrConverterRule {
-    static final SolrSortRule INSTANCE = new SolrSortRule();
+  private static class SolrSortRule extends SolrRule {
+//    static final SolrSortRule SORT_RULE = new SolrSortRule(operand(Sort.class, any()), "SolrSortRule");
 
-    private SolrSortRule() {
-      super(Sort.class, "SolrSortRule");
+    static final SolrSortRule SORT_RULE = new SolrSortRule(
+        operand(Sort.class, operand(SolrTableScan.class, none())), "SolrSortRule");
+
+    <R extends RelNode> SolrSortRule(RelOptRuleOperand rule, String description) {
+      super(rule, description);
     }
 
     public RelNode convert(RelNode rel) {
@@ -196,16 +215,16 @@ class SolrRules {
   }
 
   /**
-   * Rule to convert an {@link org.apache.calcite.rel.logical.LogicalAggregate} to an {@link SolrAggregate}.
+   * Rule to convert an {@link LogicalAggregate} to an {@link SolrAggregate}.
    */
   private static class SolrAggregateRule extends SolrConverterRule {
-    private static final RelOptRule INSTANCE = new SolrAggregateRule();
+    private static final RelOptRule AGGREGATE_RULE = new SolrAggregateRule();
 
     private SolrAggregateRule() {
       super(LogicalAggregate.class, relNode -> Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode)), "SolrAggregateRule");
     }
 
-    public RelNode convert(RelNode rel) {
+     public RelNode convert(RelNode rel) {
       final LogicalAggregate agg = (LogicalAggregate) rel;
       final RelTraitSet traitSet = agg.getTraitSet().replace(out);
       return new SolrAggregate(
