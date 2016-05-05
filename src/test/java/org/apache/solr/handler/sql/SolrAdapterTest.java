@@ -861,9 +861,8 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fields in the sort spec must be included in the field list")
   @Test
-  public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbyCountStar() throws Exception {
+  public void testSelectSingleFieldCountStarGroupBySingleFieldOrderbyCountStar() throws Exception {
     String sql = "select fielda, count(*) from test group by fielda order by count(*)";
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrSort(sort0=[$1], dir0=[ASC])\n" +
@@ -891,7 +890,6 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fields in the sort spec must be included in the field list")
   @Test
   public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbyCountOne() throws Exception {
     String sql = "select fielda, count(1) from test group by fielda order by count(1)";
@@ -951,7 +949,6 @@ public class SolrAdapterTest {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Fields in the sort spec must be included in the field list")
   @Test
   public void testSelectSingleFieldCountStarGroupByMultipleFieldsOrderByAggregate() throws Exception {
     String sql = "select fielda, fieldb, count(*) from test group by fielda, fieldb order by count(*)";
