@@ -153,15 +153,6 @@ public class SolrAdapterTest {
     result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
 
     checkQuery(sql, explainPlan, result);
-
-    /*
-    * id,fielda,fieldb,fieldc,fieldd_s,fielde_i
-    * 1,a1,b1,1,d1,1
-    * 2,a2,b2,2,d1,2
-    * 3,a1,b3,3,,1
-    * 4,a1,b4,4,d2,
-    * 5,a2,b2,,d2,2
-    */
   }
 
   @Test
@@ -1076,18 +1067,18 @@ public class SolrAdapterTest {
 
   @Test
   public void testSelectMultipleAggregationsMultipleGroupBy() throws Exception {
-    String sql = "select fielda, fieldb, min(fieldc), max(fieldc), avg(fieldc), sum(fieldc) from test " +
-        "group by fielda, fieldb";
+    String sql = "select fielda, fieldb, min(fieldc), max(fieldc), cast(avg(1.0 * fieldc) as float), " +
+        "sum(fieldc) from test group by fielda, fieldb";
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrAggregate(group=[{0, 1}], EXPR$2=[MIN($2)], EXPR$3=[MAX($2)], EXPR$4=[AVG($3)], EXPR$5=[SUM($2)])\n" +
         "    SolrProject(fielda=[$0], fieldb=[$5], fieldc=[$4], $f3=[CAST($4):FLOAT])\n" +
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[]{"a2", "b2", 0L, 2L, 1L, 2L});
-    result.add(new Object[]{"a1", "b1", 1L, 1L, 1L, 1L});
-    result.add(new Object[]{"a1", "b4", 4L, 4L, 4L, 4L});
-    result.add(new Object[]{"a1", "b3", 3L, 3L, 3L, 3L});
+    result.add(new Object[]{"a2", "b2", 0L, 2L, 1.0, 2L});
+    result.add(new Object[]{"a1", "b1", 1L, 1L, 1.0, 1L});
+    result.add(new Object[]{"a1", "b4", 4L, 4L, 4.0, 4L});
+    result.add(new Object[]{"a1", "b3", 3L, 3L, 3.0, 3L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -1095,17 +1086,17 @@ public class SolrAdapterTest {
   @Test
   public void testSelectMultipleAggregationsAliasesMultipleGroupBy() throws Exception {
     String sql = "select fielda as abc, fieldb as def, min(fieldc) as `min`, max(fieldc) as `max`, " +
-        "avg(fieldc) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
+        "cast(avg(1.0 * fieldc) as float) as `avg`, sum(fieldc) as `sum` from test group by fielda, fieldb";
     String explainPlan = "SolrToEnumerableConverter\n" +
         "  SolrAggregate(group=[{0, 1}], min=[MIN($2)], max=[MAX($2)], avg=[AVG($3)], sum=[SUM($2)])\n" +
         "    SolrProject(abc=[$0], def=[$5], fieldc=[$4], $f3=[CAST($4):FLOAT])\n" +
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[]{"a2", "b2", 0L, 2L, 1L, 2L});
-    result.add(new Object[]{"a1", "b1", 1L, 1L, 1L, 1L});
-    result.add(new Object[]{"a1", "b4", 4L, 4L, 4L, 4L});
-    result.add(new Object[]{"a1", "b3", 3L, 3L, 3L, 3L});
+    result.add(new Object[]{"a2", "b2", 0L, 2L, 1.0, 2L});
+    result.add(new Object[]{"a1", "b1", 1L, 1L, 1.0, 1L});
+    result.add(new Object[]{"a1", "b4", 4L, 4L, 4.0, 4L});
+    result.add(new Object[]{"a1", "b3", 3L, 3L, 3.0, 3L});
 
     checkQuery(sql, explainPlan, result);
   }
