@@ -847,6 +847,20 @@ public class SolrAdapterTest {
   }
 
   @Test
+  public void testSelectSingleFieldCountStarGroupBySingleFieldHavingCountStar() throws Exception {
+    String sql = "select fielda, count(*) from test group by fielda having count(*) > 2";
+    String explainPlan = "EnumerableCalc(expr#0..1=[{inputs}], expr#2=[2], expr#3=[>($t1, $t2)], proj#0..1=[{exprs}], $condition=[$t3])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a1", 3L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
   public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbySingleField() throws Exception {
     String sql = "select fielda, count(*) from test group by fielda order by fielda";
     String explainPlan = "SolrToEnumerableConverter\n" +
@@ -891,6 +905,20 @@ public class SolrAdapterTest {
   }
 
   @Test
+  public void testSelectSingleFieldCountOneGroupBySingleFieldHavingCountOne() throws Exception {
+    String sql = "select fielda, count(1) from test group by fielda having count(1) > 2";
+    String explainPlan = "EnumerableCalc(expr#0..1=[{inputs}], expr#2=[2], expr#3=[>($t1, $t2)], proj#0..1=[{exprs}], $condition=[$t3])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrAggregate(group=[{0}], EXPR$1=[COUNT()])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a1", 3L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
   public void testSelectSingleFieldCountOneGroupBySingleFieldOrderbyCountOne() throws Exception {
     String sql = "select fielda, count(1) from test group by fielda order by count(1)";
     String explainPlan = "SolrToEnumerableConverter\n" +
@@ -914,6 +942,20 @@ public class SolrAdapterTest {
 
     List<Object[]> result = new ArrayList<>();
     result.add(new Object[]{"a2", 2L});
+    result.add(new Object[]{"a1", 3L});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldCountFieldGroupBySingleFieldHavingCountField() throws Exception {
+    String sql = "select fielda, count(fielda) from test group by fielda having count(fielda) > 2";
+    String explainPlan = "EnumerableCalc(expr#0..1=[{inputs}], expr#2=[2], expr#3=[>($t1, $t2)], proj#0..1=[{exprs}], $condition=[$t3])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrAggregate(group=[{0}], EXPR$1=[COUNT($0)])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
     result.add(new Object[]{"a1", 3L});
 
     checkQuery(sql, explainPlan, result);

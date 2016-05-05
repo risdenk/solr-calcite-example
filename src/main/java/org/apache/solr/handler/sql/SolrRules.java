@@ -17,9 +17,7 @@
 package org.apache.solr.handler.sql;
 
 import org.apache.calcite.adapter.java.JavaTypeFactory;
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
@@ -121,11 +119,13 @@ class SolrRules {
   /**
    * Rule to convert a {@link LogicalFilter} to a {@link SolrFilter}.
    */
-  private static class SolrFilterRule extends SolrConverterRule {
+  private static class SolrFilterRule extends RelOptRule {
     private static final SolrFilterRule INSTANCE = new SolrFilterRule();
+    private Convention out = SolrRel.CONVENTION;
 
     private SolrFilterRule() {
-      super(LogicalFilter.class, "SolrFilterRule");
+      super(operand(LogicalFilter.class, operand(SolrTableScan.class, none())),
+          "SolrFilterRule");
     }
 
     public RelNode convert(RelNode rel) {
@@ -136,6 +136,18 @@ class SolrRules {
           traitSet,
           convert(filter.getInput(), out),
           filter.getCondition());
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      /** @see org.apache.calcite.rel.convert.ConverterRule */
+      LogicalFilter filter = call.rel(0);
+      if (filter.getTraitSet().contains(Convention.NONE)) {
+        final RelNode converted = convert(filter);
+        if (converted != null) {
+          call.transformTo(converted);
+        }
+      }
     }
   }
 
