@@ -1217,7 +1217,7 @@ public class SolrAdapterTest {
 
   private void checkQuery(String sql, String explainPlan, List<Object[]> result) throws Exception {
     try (Statement stmt = conn.createStatement()) {
-      System.out.println(getExplainPlan(stmt, sql));
+//      System.out.println(getExplainPlan(stmt, sql));
 //      assertEquals(explainPlan, getExplainPlan(stmt, sql));
       assertResultEquals(result, getResult(stmt, sql));
     }
