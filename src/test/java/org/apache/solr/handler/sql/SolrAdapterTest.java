@@ -1038,6 +1038,68 @@ public class SolrAdapterTest {
   }
 
   @Test
+  public void testSelectDistinctSingleField() throws Exception {
+    String sql = "select distinct fielda from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT(DISTINCT $0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectDistinctSingleFieldOrderByLimit() throws Exception {
+    String sql = "select distinct fielda from test order by fielda desc limit 2";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT(DISTINCT $0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectDistinctMultipleFields() throws Exception {
+    String sql = "select distinct fielda, fieldb from test";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT(DISTINCT $0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", "b2"});
+    result.add(new Object[]{"a1", "b1"});
+    result.add(new Object[]{"a1", "b4"});
+    result.add(new Object[]{"a1", "b3"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectDistinctMultipleFieldsOrderByLimit() throws Exception {
+    String sql = "select distinct fielda, fieldb from test order by fielda desc, fieldb desc limit 2";
+    String explainPlan = "SolrToEnumerableConverter\n" +
+        "  SolrAggregate(group=[{}], EXPR$0=[COUNT(DISTINCT $0)])\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[]{"a2", "b2"});
+    result.add(new Object[]{"a1", "b4"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
   public void testSelectCountDistinctSingleField() throws Exception {
     String sql = "select count(distinct fielda) from test";
     String explainPlan = "SolrToEnumerableConverter\n" +
@@ -1155,7 +1217,7 @@ public class SolrAdapterTest {
 
   private void checkQuery(String sql, String explainPlan, List<Object[]> result) throws Exception {
     try (Statement stmt = conn.createStatement()) {
-//      System.out.println(getExplainPlan(stmt, sql));
+      System.out.println(getExplainPlan(stmt, sql));
 //      assertEquals(explainPlan, getExplainPlan(stmt, sql));
       assertResultEquals(result, getResult(stmt, sql));
     }
