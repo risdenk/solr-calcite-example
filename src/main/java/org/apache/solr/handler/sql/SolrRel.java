@@ -40,35 +40,35 @@ interface SolrRel extends RelNode {
     final Map<String, String> fieldMappings = new HashMap<>();
     String query = null;
     String limitValue = null;
-    final List<String> order = new ArrayList<>();
+    final List<String> orders = new ArrayList<>();
     final List<String> buckets = new ArrayList<>();
     final List<Pair<String, String>> metricPairs = new ArrayList<>();
 
     RelOptTable table;
     SolrTable solrTable;
 
-    void addFieldMappings(Map<String, String> fieldMappings) {
-      this.fieldMappings.putAll(fieldMappings);
+    void addFieldMapping(String key, String val) {
+      if(!fieldMappings.containsKey(key)) {
+        this.fieldMappings.put(key, val);
+      }
     }
 
     void addQuery(String query) {
       this.query = query;
     }
 
-    void addOrder(List<String> order) {
-      for(String orderItem : order) {
-        String[] orderParts = orderItem.split(" ", 2);
-        String fieldName = orderParts[0];
-        String direction = orderParts[1];
-       this.order.add(this.fieldMappings.getOrDefault(fieldName, fieldName) + " " + direction);
-      }
+    void addOrder(String orderItem) {
+      String[] orderParts = orderItem.split(" ", 2);
+      String fieldName = orderParts[0];
+      String direction = orderParts[1];
+     this.orders.add(this.fieldMappings.getOrDefault(fieldName, fieldName) + " " + direction);
     }
 
-    void addBuckets(List<String> buckets) {
-      this.buckets.addAll(buckets);
+    void addBucket(String bucket) {
+      this.buckets.add(bucket);
     }
 
-    void addMetric(Pair<String, String> metricPair) {
+    void addMetricPair(Pair<String, String> metricPair) {
       this.metricPairs.add(metricPair);
     }
 

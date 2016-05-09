@@ -82,7 +82,7 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
    * @param query A string for the query
    * @return Enumerator of results
    */
-  private Enumerable<Object> query(final Properties properties, final List<String> fields,
+  private Enumerable<Object> query(final Properties properties, final List<Map.Entry<String, Class>> fields,
                                    final String query, final List<String> order, final List<String> buckets,
                                    final List<Pair<String, String>> metricPairs, final String limit) {
     // SolrParams should be a ModifiableParams instead of a map
@@ -96,14 +96,17 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
     }
 
     // List<String> doesn't have add so must make a new ArrayList
-    List<String> fieldsList = new ArrayList<>(fields);
+    List<String> fieldsList = new ArrayList<>(fields.size());
+    for(Map.Entry<String, Class> entry : fields) {
+      fieldsList.add(entry.getKey());
+    }
     List<String> orderList = new ArrayList<>(order);
 
     List<Metric> metrics = buildMetrics(metricPairs);
 
     if (!metrics.isEmpty()) {
       for(String bucket : buckets) {
-        orderList.add(bucket + " desc");
+        orderList.add(bucket + " asc");
       }
 
       for(Metric metric : metrics) {
@@ -362,7 +365,7 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
      * @see SolrMethod#SOLR_QUERYABLE_QUERY
      */
     @SuppressWarnings("UnusedDeclaration")
-    public Enumerable<Object> query(List<String> fields, String query, List<String> order, List<String> buckets,
+    public Enumerable<Object> query(List<Map.Entry<String, Class>> fields, String query, List<String> order, List<String> buckets,
                                     List<Pair<String, String>> metricPairs, String limit) {
       return getTable().query(getProperties(), fields, query, order, buckets, metricPairs, limit);
     }

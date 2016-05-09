@@ -67,25 +67,18 @@ class SolrAggregate extends Aggregate implements SolrRel {
     final List<String> inNames = SolrRules.solrFieldNames(getInput().getRowType());
     final List<String> outNames = SolrRules.solrFieldNames(getRowType());
 
-    Map<String, String> fieldMappings = new HashMap<>();
-    for(AggregateCall aggCall : aggCalls) {
+    for(AggregateCall aggCall : getAggCallList()) {
       Pair<String, String> metric = toSolrMetric(implementor, aggCall, inNames);
-      implementor.addMetric(metric);
-      fieldMappings.put(aggCall.getName(), metric.getKey().toLowerCase(Locale.ROOT) + "(" + metric.getValue() + ")");
+      implementor.addMetricPair(metric);
+      implementor.addFieldMapping(aggCall.getName(), metric.getKey().toLowerCase(Locale.ROOT) + "(" + metric.getValue() + ")");
     }
 
-    List<String> buckets = new ArrayList<>();
-    for(int group : groupSet) {
+    for(int group : getGroupSet()) {
       String inName = inNames.get(group);
       String name = implementor.fieldMappings.getOrDefault(inName, inName);
-      buckets.add(name);
-      if(!fieldMappings.containsKey(name)) {
-        fieldMappings.put(name, name);
-      }
+      implementor.addBucket(name);
+      implementor.addFieldMapping(name, name);
     }
-
-    implementor.addBuckets(buckets);
-    implementor.addFieldMappings(fieldMappings);
   }
 
   private Pair<String, String> toSolrMetric(Implementor implementor, AggregateCall aggCall, List<String> inNames) {

@@ -218,10 +218,14 @@ class SolrRules {
    * Rule to convert an {@link LogicalAggregate} to an {@link SolrAggregate}.
    */
   private static class SolrAggregateRule extends SolrConverterRule {
+    private static final Predicate<RelNode> AGGREGATE_PREDICTE = relNode ->
+        Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode)) &&
+        !((LogicalAggregate)relNode).containsDistinctCall();
+
     private static final RelOptRule AGGREGATE_RULE = new SolrAggregateRule();
 
     private SolrAggregateRule() {
-      super(LogicalAggregate.class, relNode -> Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode)), "SolrAggregateRule");
+      super(LogicalAggregate.class, AGGREGATE_PREDICTE, "SolrAggregateRule");
     }
 
      public RelNode convert(RelNode rel) {
