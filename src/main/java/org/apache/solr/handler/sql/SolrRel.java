@@ -21,10 +21,7 @@ import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.util.Pair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Relational expression that uses Solr calling convention.
@@ -40,7 +37,7 @@ interface SolrRel extends RelNode {
     final Map<String, String> fieldMappings = new HashMap<>();
     String query = null;
     String limitValue = null;
-    final List<String> orders = new ArrayList<>();
+    final List<Pair<String, String>> orders = new ArrayList<>();
     final List<String> buckets = new ArrayList<>();
     final List<Pair<String, String>> metricPairs = new ArrayList<>();
 
@@ -48,7 +45,7 @@ interface SolrRel extends RelNode {
     SolrTable solrTable;
 
     void addFieldMapping(String key, String val) {
-      if(!fieldMappings.containsKey(key)) {
+      if(key != null && !fieldMappings.containsKey(key)) {
         this.fieldMappings.put(key, val);
       }
     }
@@ -57,19 +54,24 @@ interface SolrRel extends RelNode {
       this.query = query;
     }
 
-    void addOrder(String orderItem) {
-      String[] orderParts = orderItem.split(" ", 2);
-      String fieldName = orderParts[0];
-      String direction = orderParts[1];
-     this.orders.add(this.fieldMappings.getOrDefault(fieldName, fieldName) + " " + direction);
+    void addOrder(String column, String direction) {
+      column = this.fieldMappings.getOrDefault(column, column);
+      this.orders.add(new Pair<>(column, direction));
     }
 
     void addBucket(String bucket) {
+      bucket = this.fieldMappings.getOrDefault(bucket, bucket);
       this.buckets.add(bucket);
     }
 
-    void addMetricPair(Pair<String, String> metricPair) {
-      this.metricPairs.add(metricPair);
+    void addMetricPair(String outName, String metric, String column) {
+      column = this.fieldMappings.getOrDefault(column, column);
+      this.metricPairs.add(new Pair<>(metric, column));
+
+      String metricIdentifier = metric + "(" + column + ")";
+      if(outName != null) {
+        this.addFieldMapping(outName, metricIdentifier.toLowerCase(Locale.ROOT));
+      }
     }
 
     void setLimit(String limit) {

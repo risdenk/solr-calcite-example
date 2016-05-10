@@ -67,7 +67,7 @@ class SolrSort extends Sort implements SolrRel {
         if (fieldCollation.getDirection().equals(RelFieldCollation.Direction.DESCENDING)) {
           direction = "desc";
         }
-        implementor.addOrder(name + " " + direction);
+        implementor.addOrder(name, direction);
       }
     }
 

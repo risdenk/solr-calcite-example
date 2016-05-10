@@ -219,8 +219,8 @@ class SolrRules {
    */
   private static class SolrAggregateRule extends SolrConverterRule {
     private static final Predicate<RelNode> AGGREGATE_PREDICTE = relNode ->
-        Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode)) &&
-        !((LogicalAggregate)relNode).containsDistinctCall();
+        Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode));// &&
+//        !((LogicalAggregate)relNode).containsDistinctCall();
 
     private static final RelOptRule AGGREGATE_RULE = new SolrAggregateRule();
 

@@ -18,6 +18,7 @@ package org.apache.solr.handler.sql;
 
 import com.google.common.collect.Lists;
 import org.apache.calcite.adapter.enumerable.*;
+import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;
@@ -77,7 +78,7 @@ class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
                     }),
                 Pair.class));
     final Expression query = list.append("query", Expressions.constant(solrImplementor.query, String.class));
-    final Expression orders = list.append("orders", constantArrayList(solrImplementor.orders, String.class));
+    final Expression orders = list.append("orders", constantArrayList(solrImplementor.orders, Pair.class));
     final Expression buckets = list.append("buckets", constantArrayList(solrImplementor.buckets, String.class));
     final Expression metricPairs = list.append("metricPairs", constantArrayList(solrImplementor.metricPairs, Pair.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
@@ -94,10 +95,23 @@ class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
     } else {
       List<String> fields = new ArrayList<>();
       for(String field : queryFields) {
-        fields.add(fieldMappings.getOrDefault(field, field));
+        fields.add(getField(fieldMappings, field));
       }
       return fields;
     }
+  }
+
+  private String getField(Map<String, String> fieldMappings, String field) {
+    String retField = field;
+    while(fieldMappings.containsKey(field)) {
+      field = fieldMappings.getOrDefault(field, retField);
+      if(retField.equals(field)) {
+        break;
+      } else {
+        retField = field;
+      }
+    }
+    return retField;
   }
 
   /**

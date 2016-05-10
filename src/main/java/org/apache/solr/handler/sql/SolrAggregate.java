@@ -65,19 +65,20 @@ class SolrAggregate extends Aggregate implements SolrRel {
     implementor.visitChild(0, getInput());
 
     final List<String> inNames = SolrRules.solrFieldNames(getInput().getRowType());
-    final List<String> outNames = SolrRules.solrFieldNames(getRowType());
 
-    for(AggregateCall aggCall : getAggCallList()) {
+    for(Pair<AggregateCall, String> namedAggCall : getNamedAggCalls()) {
+      AggregateCall aggCall = namedAggCall.getKey();
       Pair<String, String> metric = toSolrMetric(implementor, aggCall, inNames);
-      implementor.addMetricPair(metric);
-      implementor.addFieldMapping(aggCall.getName(), metric.getKey().toLowerCase(Locale.ROOT) + "(" + metric.getValue() + ")");
+      implementor.addMetricPair(namedAggCall.getValue(), metric.getKey(), metric.getValue());
+      if(aggCall.getName() == null) {
+        implementor.addFieldMapping(namedAggCall.getValue(),
+            aggCall.getAggregation().getName() + "(" + inNames.get(aggCall.getArgList().get(0)) + ")");
+      }
     }
 
     for(int group : getGroupSet()) {
       String inName = inNames.get(group);
-      String name = implementor.fieldMappings.getOrDefault(inName, inName);
-      implementor.addBucket(name);
-      implementor.addFieldMapping(name, name);
+      implementor.addBucket(inName);
     }
   }
 
