@@ -49,7 +49,7 @@ class SolrRules {
       SolrFilterRule.FILTER_RULE,
       SolrFilterRule.FILTER_PROJECT_RULE,
       SolrProjectRule.PROJECT_RULE,
-//      SolrSortRule.SORT_RULE,
+      SolrSortRule.SORT_RULE,
 //      SolrAggregateRule.AGGREGATE_RULE,
   };
 

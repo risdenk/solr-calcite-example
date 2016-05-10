@@ -135,13 +135,11 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
       }
     }
 
-    if (ordersList.isEmpty()) {
-      ordersList.add(new Pair<>(DEFAULT_VERSION_FIELD, "desc"));
+    ordersList.add(new Pair<>(DEFAULT_VERSION_FIELD, "desc"));
 
-      // Make sure the default sort field is in the field list
-      if (!fieldsList.contains(DEFAULT_VERSION_FIELD)) {
-        fieldsList.add(DEFAULT_VERSION_FIELD);
-      }
+    // Make sure the default sort field is in the field list
+    if (!fieldsList.contains(DEFAULT_VERSION_FIELD)) {
+      fieldsList.add(DEFAULT_VERSION_FIELD);
     }
 
     if(!ordersList.isEmpty()) {

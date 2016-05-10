@@ -69,12 +69,12 @@ class SolrEnumerator implements Enumerator<Object> {
     Class clazz = field.getValue();
 
     if(clazz.equals(Double.class)) {
-      return val == null ? 0 : val;
+      return val == null ? 0D : val;
     }
 
     if(clazz.equals(Long.class)) {
       if(val == null) {
-        return 0;
+        return 0L;
       }
       if(val instanceof Double) {
         return this.getRealVal(val);
