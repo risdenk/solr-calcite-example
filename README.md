@@ -1,5 +1,7 @@
 # solr-calcite-example
 
+[![Build Status](https://travis-ci.org/risdenk/solr-calcite-example.svg?branch=master)](https://travis-ci.org/risdenk/solr-calcite-example)
+
 ## Usage
 `mvn clean package && ./sqlline -u "jdbc:calcite:model=src/main/resources/model.json;lex=MYSQL"`
 
