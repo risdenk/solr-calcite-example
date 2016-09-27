@@ -36,10 +36,12 @@ import org.apache.solr.client.solrj.io.stream.*;
 import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.io.stream.metrics.*;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.update.VersionInfo;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Table based on a Solr collection
@@ -85,26 +87,21 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
                                    final String query, final List<Pair<String, String>> orders, final List<String> buckets,
                                    final List<Pair<String, String>> metricPairs, final String limit) {
     // SolrParams should be a ModifiableParams instead of a map
-    Map<String, String> solrParams = new HashMap<>();
-    solrParams.put(CommonParams.OMIT_HEADER, "true");
+    ModifiableSolrParams solrParams = new ModifiableSolrParams();
+    solrParams.add(CommonParams.OMIT_HEADER, "true");
 
     if (query == null) {
-      solrParams.put(CommonParams.Q, DEFAULT_QUERY);
+      solrParams.add(CommonParams.Q, DEFAULT_QUERY);
     } else {
-      solrParams.put(CommonParams.Q, DEFAULT_QUERY + " AND " + query);
+      solrParams.add(CommonParams.Q, DEFAULT_QUERY + " AND " + query);
     }
 
     // List<String> doesn't have add so must make a new ArrayList
     List<String> fieldsList = new ArrayList<>(fields.size());
-    for(Map.Entry<String, Class> entry : fields) {
-      fieldsList.add(entry.getKey());
-    }
+    fieldsList.addAll(fields.stream().map(Map.Entry::getKey).collect(Collectors.toList()));
     List<Pair<String, String>> ordersList = new ArrayList<>(orders);
     List<Metric> metrics = buildMetrics(metricPairs);
-    List<Bucket> bucketsList = new ArrayList<>();
-    for(String bucket : buckets) {
-      bucketsList.add(new Bucket(bucket));
-    }
+    List<Bucket> bucketsList = buckets.stream().map(Bucket::new).collect(Collectors.toList());
 
     for(int i = buckets.size()-1; i >= 0; i--) {
       ordersList.add(0, new Pair<>(buckets.get(i), "asc"));
@@ -154,13 +151,13 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
         }
         orderList.add(column + " " + order.getValue());
       }
-      solrParams.put(CommonParams.SORT, String.join(",", orderList));
+      solrParams.add(CommonParams.SORT, String.join(",", orderList));
     }
 
     if (fieldsList.isEmpty()) {
-      solrParams.put(CommonParams.FL, "*");
+      solrParams.add(CommonParams.FL, "*");
     } else {
-      solrParams.put(CommonParams.FL, String.join(",", fieldsList));
+      solrParams.add(CommonParams.FL, String.join(",", fieldsList));
     }
 
     TupleStream tupleStream;
@@ -168,10 +165,10 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
     try {
       if (metrics.isEmpty()) {
         if (limit == null) {
-          solrParams.put(CommonParams.QT, "/export");
+          solrParams.add(CommonParams.QT, "/export");
           tupleStream = new CloudSolrStream(zk, collection, solrParams);
         } else {
-          solrParams.put(CommonParams.ROWS, limit);
+          solrParams.add(CommonParams.ROWS, limit);
           tupleStream = new LimitStream(new CloudSolrStream(zk, collection, solrParams), Integer.parseInt(limit));
         }
       } else {
@@ -181,7 +178,7 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
           solrParams.remove(CommonParams.SORT);
           tupleStream = new StatsStream(zk, collection, solrParams, metricsArray);
         } else {
-          solrParams.put(CommonParams.QT, "/export");
+          solrParams.add(CommonParams.QT, "/export");
           tupleStream = new CloudSolrStream(zk, collection, solrParams);
           tupleStream = new RollupStream(tupleStream, bucketsList.toArray(new Bucket[bucketsList.size()]), metricsArray);
 
@@ -221,7 +218,7 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
             // Sort is the same as the same as the underlying stream
             // Only need to limit the result, not Rank the result
             if (limit != null) {
-              solrParams.put(CommonParams.ROWS, limit);
+              solrParams.add(CommonParams.ROWS, limit);
               tupleStream = new LimitStream(new CloudSolrStream(zk, collection, solrParams), Integer.parseInt(limit));
             }
           }
@@ -314,9 +311,7 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
 
   private List<Metric> buildMetrics(List<Pair<String, String>> metricPairs) {
     List<Metric> metrics = new ArrayList<>(metricPairs.size());
-    for(Pair<String, String> metricPair : metricPairs) {
-      metrics.add(getMetric(metricPair));
-    }
+    metrics.addAll(metricPairs.stream().map(this::getMetric).collect(Collectors.toList()));
     return metrics;
   }
 

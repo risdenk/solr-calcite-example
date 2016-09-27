@@ -41,6 +41,6 @@ if [ "$cygwin" ]; then
   VM_OPTS=-Djline.terminal=jline.UnixTerminal
 fi
 
-exec java $VM_OPTS -cp "${CP}" -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 sqlline.SqlLine "$@"
+exec java ${VM_OPTS} -cp "${CP}" -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005 sqlline.SqlLine "$@"
 
 # End sqlline
