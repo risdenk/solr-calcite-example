@@ -37,7 +37,6 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.io.stream.metrics.*;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.update.VersionInfo;
 
 import java.io.IOException;
 import java.util.*;
@@ -48,7 +47,7 @@ import java.util.stream.Collectors;
  */
 class SolrTable extends AbstractQueryableTable implements TranslatableTable {
   private static final String DEFAULT_QUERY = "*:*";
-  private static final String DEFAULT_VERSION_FIELD = VersionInfo.VERSION_FIELD;
+  private static final String DEFAULT_VERSION_FIELD = "_version_";
 
   private final String collection;
   private final SolrSchema schema;

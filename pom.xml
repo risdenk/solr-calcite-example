@@ -15,7 +15,7 @@
         <calcite.version>1.9.0</calcite.version>
         <avatica.version>1.8.0</avatica.version>
         <sqlline.version>1.1.9</sqlline.version>
-        <slf4j.version>1.7.7</slf4j.version>
+        <slf4j.version>1.7.21</slf4j.version>
         <junit.version>4.12</junit.version>
     </properties>
 
@@ -111,6 +111,7 @@
             <groupId>org.apache.solr</groupId>
             <artifactId>solr-test-framework</artifactId>
             <version>${solr.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
