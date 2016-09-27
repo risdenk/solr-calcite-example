@@ -18,7 +18,6 @@ package org.apache.solr.handler.sql;
 
 import com.google.common.collect.Lists;
 import org.apache.calcite.adapter.enumerable.*;
-import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.linq4j.tree.Expressions;

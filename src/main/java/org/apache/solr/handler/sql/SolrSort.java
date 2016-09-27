@@ -29,7 +29,6 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**

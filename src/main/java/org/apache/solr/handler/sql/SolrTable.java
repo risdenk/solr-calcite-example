@@ -104,7 +104,10 @@ class SolrTable extends AbstractQueryableTable implements TranslatableTable {
     List<Bucket> bucketsList = new ArrayList<>();
     for(String bucket : buckets) {
       bucketsList.add(new Bucket(bucket));
-      ordersList.add(0, new Pair<>(bucket, "asc"));
+    }
+
+    for(int i = buckets.size()-1; i >= 0; i--) {
+      ordersList.add(0, new Pair<>(buckets.get(i), "asc"));
     }
 
     for(Metric metric : metrics) {

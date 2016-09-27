@@ -29,7 +29,7 @@ public class TestAvaticaServer {
     Main.main(new String[]{MyMetaFactory.class.getName()});
   }
 
-  public static class MyMetaFactory implements Meta.Factory {
+  private static class MyMetaFactory implements Meta.Factory {
     public MyMetaFactory() {
       super();
     }
