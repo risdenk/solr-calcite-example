@@ -15,7 +15,7 @@
 
         <calcite.version>1.10.0</calcite.version>
         <avatica.version>1.9.0-SNAPSHOT</avatica.version>
-        <avatica-core.version>1.9.0-SNAPSHOT</avatica-core.version>
+        <avatica-core.version>${avatica.version}</avatica-core.version>
 
         <jetty.version>9.3.8.v20160314</jetty.version>
         <jetty-security.version>${jetty.version}</jetty-security.version>
@@ -75,7 +75,7 @@
         <dependency>
             <groupId>org.apache.calcite.avatica</groupId>
             <artifactId>avatica-core</artifactId>
-            <version>${avatica.version}</version>
+            <version>${avatica-core.version}</version>
         </dependency>
 
         <dependency>
