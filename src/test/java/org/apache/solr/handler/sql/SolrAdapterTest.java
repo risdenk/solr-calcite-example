@@ -4,6 +4,7 @@ import org.apache.calcite.config.Lex;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.update.VersionInfo;
@@ -28,12 +29,17 @@ public class SolrAdapterTest {
   private static final String CONFIG_NAME = "test";
   private static final String COLLECTION_NAME = "test";
 
+  private static Path tempLogDirectory;
   private static MiniSolrCloudCluster miniSolrCloudCluster;
   private static Connection conn;
   private static String zkAddress;
 
   @BeforeClass
   public static void setUp() throws Exception {
+    tempLogDirectory = Files.createTempDirectory(SolrAdapterTest.class.getCanonicalName());
+
+    System.setProperty("solr.log.dir", tempLogDirectory.toString());
+
     setupSolr();
     indexDocs();
     setupConnection();
@@ -47,9 +53,10 @@ public class SolrAdapterTest {
 
     URL solr_conf = SolrAdapterTest.class.getClassLoader().getResource("solr_conf");
     assertNotNull(solr_conf);
-    miniSolrCloudCluster.uploadConfigDir(Paths.get(solr_conf.toURI()).toFile(), CONFIG_NAME);
+    miniSolrCloudCluster.uploadConfigSet(Paths.get(solr_conf.toURI()), CONFIG_NAME);
 
-    miniSolrCloudCluster.createCollection(COLLECTION_NAME, 1, 1, CONFIG_NAME, Collections.emptyMap());
+    CollectionAdminRequest.createCollection(COLLECTION_NAME, CONFIG_NAME, 1, 1)
+        .process(miniSolrCloudCluster.getSolrClient());
 
     zkAddress = miniSolrCloudCluster.getZkServer().getZkAddress();
   }
@@ -121,6 +128,8 @@ public class SolrAdapterTest {
     } finally {
       miniSolrCloudCluster = null;
     }
+
+    Files.deleteIfExists(tempLogDirectory);
   }
 
   @Test

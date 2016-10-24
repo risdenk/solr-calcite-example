@@ -65,7 +65,7 @@ class SolrRules {
           public int size() {
             return rowType.getFieldCount();
           }
-        });
+        }, true);
   }
 
   /** Translator from {@link RexNode} to strings in Solr's expression language. */
@@ -127,9 +127,11 @@ class SolrRules {
 
     abstract public RelNode convert(RelNode rel);
 
+    /**
+     * @see ConverterRule
+     */
     @Override
     public void onMatch(RelOptRuleCall call) {
-      /** @see ConverterRule */
       RelNode rel = call.rel(0);
       if (rel.getTraitSet().contains(Convention.NONE)) {
         final RelNode converted = convert(rel);

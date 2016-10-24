@@ -19,6 +19,8 @@ package org.apache.solr.handler.sql;
 import org.apache.calcite.linq4j.Enumerator;
 import org.apache.solr.client.solrj.io.Tuple;
 import org.apache.solr.client.solrj.io.stream.TupleStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -26,6 +28,8 @@ import java.util.Map;
 
 /** Enumerator that reads from a Solr collection. */
 class SolrEnumerator implements Enumerator<Object> {
+  private static final Logger logger = LoggerFactory.getLogger(SolrEnumerator.class);
+
   private final TupleStream tupleStream;
   private final List<Map.Entry<String, Class>> fields;
   private Tuple current;
@@ -110,7 +114,7 @@ class SolrEnumerator implements Enumerator<Object> {
         return true;
       }
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.error("IOException", e);
       return false;
     }
   }
