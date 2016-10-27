@@ -1,9 +1,9 @@
 package org.apache.solr.handler.sql;
 
-import org.apache.calcite.config.Lex;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.embedded.JettyConfig;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.io.sql.DriverImpl;
 import org.apache.solr.client.solrj.request.CollectionAdminRequest;
 import org.apache.solr.cloud.MiniSolrCloudCluster;
 import org.apache.solr.common.SolrInputDocument;
@@ -19,13 +19,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
-public class SolrAdapterTest {
+public class SolrCalciteSQLHandlerTest {
   private static final String CONFIG_NAME = "test";
   private static final String COLLECTION_NAME = "test";
 
@@ -83,17 +83,15 @@ public class SolrAdapterTest {
   }
 
   private static void setupConnection() throws Exception {
-    String driverClass = CalciteSolrDriver.class.getName();
+    String driverClass = DriverImpl.class.getName();
     try {
       Class.forName(driverClass);
     } catch (ClassNotFoundException e) {
       throw new IOException(e);
     }
 
-    String url = "jdbc:calcitesolr:";
+    String url = "jdbc:solr://" + zkAddress + "?collection=" + COLLECTION_NAME;
     Properties properties = new Properties();
-    properties.setProperty("lex", Lex.MYSQL.toString());
-    properties.setProperty("zk", zkAddress);
     conn = DriverManager.getConnection(url, properties);
     System.out.println(url);
   }
@@ -113,7 +111,7 @@ public class SolrAdapterTest {
   @AfterClass
   public static void tearDown() throws Exception {
     try {
-      if(conn != null) {
+      if (conn != null) {
         conn.close();
       }
     } catch (SQLException e) {
@@ -124,7 +122,7 @@ public class SolrAdapterTest {
     }
 
     try {
-      if(miniSolrCloudCluster != null) {
+      if (miniSolrCloudCluster != null) {
         miniSolrCloudCluster.shutdown();
       }
     } finally {
@@ -142,11 +140,11 @@ public class SolrAdapterTest {
         "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
-    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
-    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
-    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[]{"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[]{"a1", null, 1L, "1", 1L, "b1", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -160,8 +158,8 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -175,9 +173,9 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
-    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
-    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[]{"a1", null, 1L, "1", 1L, "b1", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -191,8 +189,8 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a2", null, 1L, "2", 2L, "b2", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -219,9 +217,9 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
-    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
-    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[]{"a1", null, 1L, "1", 1L, "b1", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -235,8 +233,8 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a2", null, 1L, "2", 2L, "b2", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -250,11 +248,11 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
-    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
-    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
-    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[]{"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[]{"a1", null, 1L, "1", 1L, "b1", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -268,11 +266,11 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
-    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
-    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
-    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[]{"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[]{"a1", null, 1L, "1", 1L, "b1", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -286,11 +284,11 @@ public class SolrAdapterTest {
         "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
-    result.add(new Object[] {"a1", null, 0L, "4", 4L, "b4", "d2"});
-    result.add(new Object[] {"a1", null, 1L, "3", 3L, "b3", null});
-    result.add(new Object[] {"a2", null, 1L, "2", 2L, "b2", "d1"});
-    result.add(new Object[] {"a1", null, 1L, "1", 1L, "b1", "d1"});
+    result.add(new Object[]{"a2", null, 2L, "5", 0L, "b2", "d2"});
+    result.add(new Object[]{"a1", null, 0L, "4", 4L, "b4", "d2"});
+    result.add(new Object[]{"a1", null, 1L, "3", 3L, "b3", null});
+    result.add(new Object[]{"a2", null, 1L, "2", 2L, "b2", "d1"});
+    result.add(new Object[]{"a1", null, 1L, "1", 1L, "b1", "d1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -304,11 +302,11 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -323,8 +321,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -339,8 +337,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -355,8 +353,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a2"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -371,9 +369,9 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -388,8 +386,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a2"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a2"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -418,9 +416,9 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -435,8 +433,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a2"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a2"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -451,11 +449,11 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -470,11 +468,11 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -488,11 +486,11 @@ public class SolrAdapterTest {
         "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -506,11 +504,11 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -525,8 +523,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a2"});
+    result.add(new Object[]{"a1"});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -541,8 +539,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1"});
-    result.add(new Object[] {"a1"});
+    result.add(new Object[]{"a1"});
+    result.add(new Object[]{"a1"});
     checkQuery(sql, explainPlan, result);
   }
 
@@ -555,11 +553,11 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -574,8 +572,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -590,8 +588,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -606,9 +604,9 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -623,8 +621,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -653,9 +651,9 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -670,8 +668,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -686,11 +684,11 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -705,11 +703,11 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -723,11 +721,11 @@ public class SolrAdapterTest {
         "  SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -741,11 +739,11 @@ public class SolrAdapterTest {
         "    SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
-    result.add(new Object[] {"a2", "b2", 2L, "d1", 1L});
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a2", "b2", 2L, "d1", 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -760,8 +758,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a2", "b2", 0L, "d2", 2L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -776,8 +774,8 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", "b4", 4L, "d2", 0L});
-    result.add(new Object[] {"a1", "b3", 3L, null, 1L});
+    result.add(new Object[]{"a1", "b4", 4L, "d2", 0L});
+    result.add(new Object[]{"a1", "b3", 3L, null, 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -796,7 +794,7 @@ public class SolrAdapterTest {
         "        SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {"a1", "b1", 1L, "d1", 1L});
+    result.add(new Object[]{"a1", "b1", 1L, "d1", 1L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -810,7 +808,7 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {5L});
+    result.add(new Object[]{5L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -824,7 +822,7 @@ public class SolrAdapterTest {
         "      SolrTableScan(table=[[" + zkAddress + ", " + COLLECTION_NAME + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
-    result.add(new Object[] {5L});
+    result.add(new Object[]{5L});
 
     checkQuery(sql, explainPlan, result);
   }
@@ -1205,10 +1203,10 @@ public class SolrAdapterTest {
         Object[] row = new Object[rsMetaData.getColumnCount()];
         for (int i = 0; i < rsMetaData.getColumnCount(); i++) {
           // Force _version_ to be null since can't check it
-          if(VersionInfo.VERSION_FIELD.equals(rsMetaData.getColumnName(i+1))) {
+          if (VersionInfo.VERSION_FIELD.equals(rsMetaData.getColumnName(i + 1))) {
             row[i] = null;
           } else {
-            row[i] = rs.getObject(i+1);
+            row[i] = rs.getObject(i + 1);
           }
         }
         result.add(row);
@@ -1219,7 +1217,7 @@ public class SolrAdapterTest {
 
   private void assertResultEquals(List<Object[]> expected, List<Object[]> actual) {
     assertEquals("Result is a different size", expected.size(), actual.size());
-    for(int i = 0; i < expected.size(); i++) {
+    for (int i = 0; i < expected.size(); i++) {
       Object[] expectedRow = expected.get(i);
       Object[] actualRow = actual.get(i);
       assertArrayEquals("Row " + i, expectedRow, actualRow);
