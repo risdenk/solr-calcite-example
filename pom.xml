@@ -14,7 +14,7 @@
         <solr.version>6.3.0-SNAPSHOT</solr.version>
 
         <calcite.version>1.11.0-SNAPSHOT</calcite.version>
-        <avatica.version>1.9.0-SNAPSHOT</avatica.version>
+        <avatica.version>1.9.0</avatica.version>
         <avatica-core.version>${avatica.version}</avatica-core.version>
 
         <jetty.version>9.3.8.v20160314</jetty.version>
