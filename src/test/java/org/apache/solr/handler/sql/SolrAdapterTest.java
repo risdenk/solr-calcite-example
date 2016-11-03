@@ -90,7 +90,7 @@ public class SolrAdapterTest {
       throw new IOException(e);
     }
 
-    String url = "jdbc:calcitesolr:";
+    String url = CalciteSolrDriver.CONNECT_STRING_PREFIX;
     Properties properties = new Properties();
     properties.setProperty("lex", Lex.MYSQL.toString());
     properties.setProperty("zk", zkAddress);
