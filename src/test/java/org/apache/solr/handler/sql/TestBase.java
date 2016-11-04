@@ -286,13 +286,13 @@ abstract class TestBase {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Field equality is not supported")
   @Test
   public void testSelectStarWhereFieldEqual() throws Exception {
     String sql = "select * from test where fielda = fielda";
 
-    String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
+    String explainPlan = "EnumerableCalc(expr#0..6=[{inputs}], expr#7=[CAST($t0):VARCHAR(1) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], expr#8=[=($t7, $t7)], proj#0..6=[{exprs}], $condition=[$t8])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
     result.add(new Object[] {"a2", null, 2L, "5", 0L, "b2", "d2"});
@@ -488,13 +488,33 @@ abstract class TestBase {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Field equality is not supported")
   @Test
   public void testSelectSingleFieldWhereFieldEqual() throws Exception {
     String sql = "select fielda from test where fielda = fielda";
 
-    String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
+    String explainPlan = "EnumerableCalc(expr#0=[{inputs}], expr#1=[CAST($t0):VARCHAR(1) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], expr#2=[=($t1, $t1)], fielda=[$t0], $condition=[$t2])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
+
+    List<Object[]> result = new ArrayList<>();
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a1"});
+    result.add(new Object[] {"a2"});
+    result.add(new Object[] {"a1"});
+
+    checkQuery(sql, explainPlan, result);
+  }
+
+  @Test
+  public void testSelectSingleFieldWhereLiteralEqual() throws Exception {
+    String sql = "select fielda from test where 1 = 1";
+
+    String explainPlan = "EnumerableCalc(expr#0=[{inputs}], expr#1=[1], expr#2=[=($t1, $t1)], fielda=[$t0], $condition=[$t2])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrProject(fielda=[$0])\n" +
+        "      SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
     result.add(new Object[] {"a2"});
@@ -723,13 +743,13 @@ abstract class TestBase {
     checkQuery(sql, explainPlan, result);
   }
 
-  @Ignore("Field equality is not supported")
   @Test
   public void testSelectMultipleFieldsWhereFieldEqual() throws Exception {
     String sql = "select fielda, fieldb, fieldc, fieldd_s, fielde_i from test where fielda = fielda";
 
-    String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
+    String explainPlan = "EnumerableCalc(expr#0..6=[{inputs}], expr#7=[CAST($t0):VARCHAR(1) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], expr#8=[=($t7, $t7)], fielda=[$t0], fieldb=[$t5], fieldc=[$t4], fieldd_s=[$t6], fielde_i=[$t2], $condition=[$t8])\n" +
+        "  SolrToEnumerableConverter\n" +
+        "    SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
 
     List<Object[]> result = new ArrayList<>();
     result.add(new Object[] {"a2", "b2", 0L, "d2", 2L});
@@ -796,12 +816,10 @@ abstract class TestBase {
     String sql = "select fielda as abc, fieldb as def, fieldc, fieldd_s, fielde_i from test " +
         "where fielda = 'a1' and fieldb = 'b1' order by def limit 2";
 
-    String explainPlan = "SolrToEnumerableConverter\n" +
-        "  SolrSort(sort0=[$1], dir0=[ASC], fetch=[2])\n" +
-        "    SolrProject(abc=[$0], def=[$5], fieldc=[$4], fieldd_s=[$6], fielde_i=[$2])\n" +
-        "      SolrFilter(condition=[AND(" +
-        "=(CAST($0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'a1'), " +
-        "=(CAST($5):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\", 'b1'))])\n" +
+    String explainPlan = "EnumerableLimit(fetch=[2])\n" +
+        "  EnumerableSort(sort0=[$1], dir0=[ASC])\n" +
+        "    EnumerableCalc(expr#0..6=[{inputs}], expr#7=[CAST($t0):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], expr#8=['a1'], expr#9=[=($t7, $t8)], expr#10=[CAST($t5):VARCHAR(2) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], expr#11=['b1'], expr#12=[=($t10, $t11)], expr#13=[AND($t9, $t12)], abc=[$t0], def=[$t5], fieldc=[$t4], fieldd_s=[$t6], fielde_i=[$t2], $condition=[$t13])\n" +
+        "      SolrToEnumerableConverter\n" +
         "        SolrTableScan(table=[[" + getZkAddress() + ", " + getCollectionName() + "]])\n";
 
     List<Object[]> result = new ArrayList<>();

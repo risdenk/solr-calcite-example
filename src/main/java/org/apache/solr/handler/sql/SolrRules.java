@@ -121,11 +121,19 @@ class SolrRules {
    * Rule to convert a {@link LogicalFilter} to a {@link SolrFilter}.
    */
   private static class SolrFilterRule extends SolrConverterRule {
+    private static final Predicate<RelNode> FILTER_PREDICATE = relNode -> {
+      List<RexNode> filterOperands = ((RexCall) ((LogicalFilter) relNode).getCondition()).getOperands();
+      return filterOperands.size() == 2 &&
+          ((!filterOperands.get(0).getKind().equals(SqlKind.LITERAL)
+              && filterOperands.get(1).getKind().equals(SqlKind.LITERAL))
+            || (filterOperands.get(0).getKind().equals(SqlKind.LITERAL)
+              && !filterOperands.get(1).getKind().equals(SqlKind.LITERAL)));
+    };
 
     private static final SolrFilterRule FILTER_RULE = new SolrFilterRule();
 
     private SolrFilterRule() {
-      super(LogicalFilter.class, relNode -> true, "SolrFilterRule");
+      super(LogicalFilter.class, FILTER_PREDICATE, "SolrFilterRule");
     }
 
     public RelNode convert(RelNode rel) {
