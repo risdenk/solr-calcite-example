@@ -17,7 +17,11 @@
 package org.apache.solr.client.solrj.io.stream;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
@@ -54,8 +58,8 @@ public class StatsStream extends TupleStream implements Expressible  {
   private String collection;
   private boolean done;
   private boolean doCount;
-  private transient SolrClientCache cache;
-  private transient CloudSolrClient cloudSolrClient;
+  protected transient SolrClientCache cache;
+  protected transient CloudSolrClient cloudSolrClient;
 
   // Use StatsStream(String, String, SolrParams, Metric[]
   @Deprecated
@@ -80,7 +84,7 @@ public class StatsStream extends TupleStream implements Expressible  {
     this.collection = collection;
   }
 
-  public StatsStream(StreamExpression expression, StreamFactory factory) throws IOException {
+  public StatsStream(StreamExpression expression, StreamFactory factory) throws IOException{   
     // grab all parameters out
     String collectionName = factory.getValueOperand(expression, 0);
     List<StreamExpressionNamedParameter> namedParams = factory.getNamedOperands(expression);
@@ -103,8 +107,11 @@ public class StatsStream extends TupleStream implements Expressible  {
     }
 
     ModifiableSolrParams params = new ModifiableSolrParams();
-    namedParams.stream().filter(namedParam -> !namedParam.getName().equals("zkHost"))
-        .forEach(namedParam -> params.set(namedParam.getName(), namedParam.getParameter().toString().trim()));
+    for(StreamExpressionNamedParameter namedParam : namedParams){
+      if(!namedParam.getName().equals("zkHost")){
+        params.set(namedParam.getName(), namedParam.getParameter().toString().trim());
+      }
+    }
     
     // zkHost, optional - if not provided then will look into factory list to get
     String zkHost = null;
@@ -144,7 +151,7 @@ public class StatsStream extends TupleStream implements Expressible  {
     // parameters
     ModifiableSolrParams mParams = new ModifiableSolrParams(params);
     for (Entry<String, String[]> param : mParams.getMap().entrySet()) {
-      expression.addParameter(new StreamExpressionNamedParameter(param.getKey(), String.join(",", (CharSequence[]) param.getValue())));
+      expression.addParameter(new StreamExpressionNamedParameter(param.getKey(), String.join(",", param.getValue())));
     }
     
     // zkHost
@@ -169,14 +176,14 @@ public class StatsStream extends TupleStream implements Expressible  {
     explanation.setExpression(toExpression(factory).toString());
     
     StreamExplanation child = new StreamExplanation(getStreamNodeId() + "-datastore");
-    child.setFunctionName("solr (worker ? of ?)");
+    child.setFunctionName(String.format(Locale.ROOT, "solr (worker ? of ?)")); 
       // TODO: fix this so we know the # of workers - check with Joel about a Stat's ability to be in a
       // parallel stream.
     
     child.setImplementingClass("Solr/Lucene");
     child.setExpressionType(ExpressionType.DATASTORE);
     ModifiableSolrParams mParams = new ModifiableSolrParams(params);
-    child.setExpression(mParams.getMap().entrySet().stream().map(e -> String.format(Locale.ROOT, "%s=%s", e.getKey(), Arrays.toString(e.getValue()))).collect(Collectors.joining(",")));
+    child.setExpression(mParams.getMap().entrySet().stream().map(e -> String.format(Locale.ROOT, "%s=%s", e.getKey(), e.getValue())).collect(Collectors.joining(",")));
     explanation.addChild(child);
     
     return explanation;
@@ -249,22 +256,20 @@ public class StatsStream extends TupleStream implements Expressible  {
           stats = new ArrayList<>();
         }
 
-        if (!column.equals("*")) {
+        if(!column.equals("*")) {
           m.put(column, stats);
         }
 
-        switch (function) {
-          case "min":
-          case "max":
-          case "sum":
-            stats.add(function);
-            break;
-          case "avg":
+        if(function.equals("min")) {
+          stats.add("min");
+        } else if(function.equals("max")) {
+          stats.add("max");
+        } else if(function.equals("sum")) {
+          stats.add("sum");
+        } else if(function.equals("avg")) {
           stats.add("mean");
-            break;
-          case "count":
+        } else if(function.equals("count")) {
           this.doCount = true;
-            break;
         }
       }
     }
@@ -286,20 +291,24 @@ public class StatsStream extends TupleStream implements Expressible  {
   private Tuple getTuple(NamedList response) {
 
     Map<String, Object> map = new HashMap<>();
+    SolrDocumentList solrDocumentList = (SolrDocumentList) response.get("response");
+
+    long count = solrDocumentList.getNumFound();
 
     if(doCount) {
-      SolrDocumentList solrDocumentList = (SolrDocumentList) response.get("response");
-      map.put("count(*)", solrDocumentList.getNumFound());
+      map.put("count(*)", count);
     }
 
-    NamedList stats = (NamedList)response.get("stats");
-    NamedList statsFields = (NamedList)stats.get("stats_fields");
+    if(count != 0) {
+      NamedList stats = (NamedList)response.get("stats");
+      NamedList statsFields = (NamedList)stats.get("stats_fields");
 
-    for(int i=0; i<statsFields.size(); i++) {
-      String field = statsFields.getName(i);
-      NamedList theStats = (NamedList)statsFields.getVal(i);
-      for(int s=0; s<theStats.size(); s++) {
-        addStat(map, field, theStats.getName(s), theStats.getVal(s));
+      for(int i=0; i<statsFields.size(); i++) {
+        String field = statsFields.getName(i);
+        NamedList theStats = (NamedList)statsFields.getVal(i);
+        for(int s=0; s<theStats.size(); s++) {
+          addStat(map, field, theStats.getName(s), theStats.getVal(s));
+        }
       }
     }
 
@@ -311,26 +320,10 @@ public class StatsStream extends TupleStream implements Expressible  {
   }
 
   private void addStat(Map<String, Object> map, String field, String stat, Object val) {
-    Object realVal = getRealVal(val);
     if(stat.equals("mean")) {
-      map.put("avg("+field+")", realVal);
+      map.put("avg("+field+")", val);
     } else {
-      map.put(stat+"("+field+")", realVal);
+      map.put(stat+"("+field+")", val);
     }
-  }
-
-  private Object getRealVal(Object val) {
-    // Check if Double is really a Long
-    if(val instanceof Double) {
-      Double doubleVal = (double) val;
-      //make sure that double has no decimals and fits within Long
-      if(doubleVal % 1 == 0 && doubleVal >= Long.MIN_VALUE && doubleVal <= Long.MAX_VALUE) {
-        return doubleVal.longValue();
-      }
-      return doubleVal;
-    }
-
-    // Wasn't a double so just return original Object
-    return val;
   }
 }
