@@ -11,9 +11,9 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <solr.version>6.4.0-SNAPSHOT</solr.version>
+        <solr.version>7.0.0-SNAPSHOT</solr.version>
 
-        <calcite.version>1.11.0-SNAPSHOT</calcite.version>
+        <calcite.version>1.11.0</calcite.version>
         <avatica.version>1.9.0</avatica.version>
         <avatica-core.version>${avatica.version}</avatica-core.version>
 
