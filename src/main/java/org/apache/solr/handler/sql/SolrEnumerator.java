@@ -23,16 +23,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 
 /** Enumerator that reads from a Solr collection. */
 class SolrEnumerator implements Enumerator<Object> {
-  private static final Logger logger = LoggerFactory.getLogger(SolrEnumerator.class);
+  private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private final TupleStream tupleStream;
   private final List<Map.Entry<String, Class>> fields;
   private Tuple current;
+  private char sep = 31;
 
   /** Creates a SolrEnumerator.
    *
@@ -81,6 +84,17 @@ class SolrEnumerator implements Enumerator<Object> {
         return this.getRealVal(val);
       }
       return val;
+    }
+
+    if(val instanceof ArrayList) {
+      ArrayList arrayList = (ArrayList) val;
+      StringBuilder buf = new StringBuilder();
+
+      for(Object o : arrayList) {
+        buf.append(sep);
+        buf.append(o.toString());
+      }
+      val = buf.toString();
     }
 
     return val;

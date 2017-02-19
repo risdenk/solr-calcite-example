@@ -21,7 +21,6 @@ import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
-import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -50,7 +49,7 @@ class SolrRules {
       SolrSortRule.SORT_RULE,
       SolrFilterRule.FILTER_RULE,
       SolrProjectRule.PROJECT_RULE,
-//      SolrAggregateRule.AGGREGATE_RULE,
+      SolrAggregateRule.AGGREGATE_RULE,
   };
 
   static List<String> solrFieldNames(final RelDataType rowType) {
@@ -112,7 +111,7 @@ class SolrRules {
     }
 
     <R extends RelNode> SolrConverterRule(Class<R> clazz, Predicate<RelNode> predicate, String description) {
-      super(clazz, predicate::test, Convention.NONE, SolrRel.CONVENTION, description);
+      super(clazz, Convention.NONE, SolrRel.CONVENTION, description);
     }
   }
 
@@ -120,17 +119,11 @@ class SolrRules {
    * Rule to convert a {@link LogicalFilter} to a {@link SolrFilter}.
    */
   private static class SolrFilterRule extends SolrConverterRule {
-    private static boolean oneSideIsLiteral(List<RexNode> filterOperands) {
-      return filterOperands.size() == 2 &&
-          ((!filterOperands.get(0).getKind().equals(SqlKind.LITERAL)
-              && filterOperands.get(1).getKind().equals(SqlKind.LITERAL))
-              || (filterOperands.get(0).getKind().equals(SqlKind.LITERAL)
-              && !filterOperands.get(1).getKind().equals(SqlKind.LITERAL)));
-    }
-
     private static boolean isNotFilterByExpr(List<RexNode> rexNodes, List<String> fieldNames) {
+
       // We dont have a way to filter by result of aggregator now
       boolean result = true;
+
       for (RexNode rexNode : rexNodes) {
         if (rexNode instanceof RexCall) {
           result = result && isNotFilterByExpr(((RexCall) rexNode).getOperands(), fieldNames);
@@ -143,8 +136,7 @@ class SolrRules {
 
     private static final Predicate<RelNode> FILTER_PREDICATE = relNode -> {
       List<RexNode> filterOperands = ((RexCall) ((LogicalFilter) relNode).getCondition()).getOperands();
-      return oneSideIsLiteral(filterOperands)
-          && isNotFilterByExpr(filterOperands, SolrRules.solrFieldNames(relNode.getRowType()));
+      return isNotFilterByExpr(filterOperands, SolrRules.solrFieldNames(relNode.getRowType()));
     };
 
     private static final SolrFilterRule FILTER_RULE = new SolrFilterRule();
@@ -215,8 +207,8 @@ class SolrRules {
    * Rule to convert an {@link LogicalAggregate} to an {@link SolrAggregate}.
    */
   private static class SolrAggregateRule extends SolrConverterRule {
-    private static final Predicate<RelNode> AGGREGATE_PREDICTE = relNode ->
-        Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode));// &&
+//    private static final Predicate<RelNode> AGGREGATE_PREDICTE = relNode ->
+//        Aggregate.IS_SIMPLE.apply(((LogicalAggregate)relNode));// &&
 //        !((LogicalAggregate)relNode).containsDistinctCall();
 
     private static final RelOptRule AGGREGATE_RULE = new SolrAggregateRule();

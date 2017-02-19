@@ -35,7 +35,10 @@ interface SolrRel extends RelNode {
   /** Callback for the implementation process that converts a tree of {@link SolrRel} nodes into a Solr query. */
   class Implementor {
     final Map<String, String> fieldMappings = new HashMap<>();
+    final Map<String, String> reverseAggMappings = new HashMap<>();
     String query = null;
+    String havingPredicate;
+    boolean negativeQuery;
     String limitValue = null;
     final List<Pair<String, String>> orders = new ArrayList<>();
     final List<String> buckets = new ArrayList<>();
@@ -50,8 +53,18 @@ interface SolrRel extends RelNode {
       }
     }
 
+    void addReverseAggMapping(String key, String val) {
+      if(key != null && !reverseAggMappings.containsKey(key)) {
+        this.reverseAggMappings.put(key, val);
+      }
+    }
+
     void addQuery(String query) {
       this.query = query;
+    }
+
+    void setNegativeQuery(boolean negativeQuery) {
+      this.negativeQuery = negativeQuery;
     }
 
     void addOrder(String column, String direction) {
@@ -73,6 +86,11 @@ interface SolrRel extends RelNode {
         this.addFieldMapping(outName, metricIdentifier);
       }
     }
+
+    void setHavingPredicate(String havingPredicate) {
+      this.havingPredicate = havingPredicate;
+    }
+
 
     void setLimit(String limit) {
       limitValue = limit;

@@ -67,11 +67,13 @@ class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
             constantArrayList(
                 Pair.zip(generateFields(SolrRules.solrFieldNames(rowType), solrImplementor.fieldMappings),
                     new AbstractList<Class>() {
-                      @Override public Class get(int index) {
+                      @Override
+                      public Class get(int index) {
                         return physType.fieldClass(index);
                       }
 
-                      @Override public int size() {
+                      @Override
+                      public int size() {
                         return rowType.getFieldCount();
                       }
                     }),
@@ -81,8 +83,10 @@ class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
     final Expression buckets = list.append("buckets", constantArrayList(solrImplementor.buckets, String.class));
     final Expression metricPairs = list.append("metricPairs", constantArrayList(solrImplementor.metricPairs, Pair.class));
     final Expression limit = list.append("limit", Expressions.constant(solrImplementor.limitValue));
+    final Expression negativeQuery = list.append("negativeQuery", Expressions.constant(Boolean.toString(solrImplementor.negativeQuery), String.class));
+    final Expression havingPredicate = list.append("havingTest", Expressions.constant(solrImplementor.havingPredicate, String.class));
     Expression enumerable = list.append("enumerable", Expressions.call(table, SolrMethod.SOLR_QUERYABLE_QUERY.method,
-        fields, query, orders, buckets, metricPairs, limit));
+        fields, query, orders, buckets, metricPairs, limit, negativeQuery, havingPredicate));
     Hook.QUERY_PLAN.run(query);
     list.add(Expressions.return_(null, enumerable));
     return implementor.result(physType, list.toBlock());
@@ -123,8 +127,7 @@ class SolrToEnumerableConverter extends ConverterImpl implements EnumerableRel {
   }
 
   /**
-   * E.g. {@code constantList("x", "y")} returns
-   * {@code {ConstantExpression("x"), ConstantExpression("y")}}.
+   * E.g. {@code constantList("x", "y")} returns "{ConstantExpression("x"), ConstantExpression("y")}".
    */
   private static <T> List<Expression> constantList(List<T> values) {
     return Lists.transform(values, Expressions::constant);

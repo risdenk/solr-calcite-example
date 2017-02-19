@@ -25,8 +25,16 @@ import java.util.List;
  * Builtin methods in the Solr adapter.
  */
 enum SolrMethod {
-  SOLR_QUERYABLE_QUERY(SolrTable.SolrQueryable.class, "query", List.class, String.class, List.class, List.class,
-      List.class, String.class);
+  SOLR_QUERYABLE_QUERY(SolrTable.SolrQueryable.class,
+                       "query",
+                       List.class,
+                       String.class,
+                       List.class,
+                       List.class,
+                       List.class,
+                       String.class,
+                       String.class,
+                       String.class);
 
   public final Method method;
 

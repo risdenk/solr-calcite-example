@@ -25,13 +25,15 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.request.LukeRequest;
 import org.apache.solr.client.solrj.response.LukeResponse;
+import org.apache.solr.common.cloud.Aliases;
+import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.ZkStateReader;
 import org.apache.solr.common.luke.FieldFlag;
 
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 class SolrSchema extends AbstractSchema {
   final Properties properties;
@@ -46,12 +48,22 @@ class SolrSchema extends AbstractSchema {
     String zk = this.properties.getProperty("zk");
     try(CloudSolrClient cloudSolrClient = new CloudSolrClient.Builder().withZkHost(zk).build()) {
       cloudSolrClient.connect();
-      Set<String> collections = cloudSolrClient.getZkStateReader().getClusterState().getCollectionsMap().keySet();
+      ZkStateReader zkStateReader = cloudSolrClient.getZkStateReader();
+      ClusterState clusterState = zkStateReader.getClusterState();
 
       final ImmutableMap.Builder<String, Table> builder = ImmutableMap.builder();
-      for (String collection : collections) {
+
+      for (String collection : clusterState.getCollectionsMap().keySet()) {
         builder.put(collection, new SolrTable(this, collection));
       }
+
+      Aliases aliases = zkStateReader.getAliases();
+      if(aliases.collectionAliasSize() > 0) {
+        for (Map.Entry<String, String> alias : aliases.getCollectionAliasMap().entrySet()) {
+          builder.put(alias.getKey(), new SolrTable(this, alias.getValue()));
+        }
+      }
+
       return builder.build();
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -78,6 +90,7 @@ class SolrSchema extends AbstractSchema {
     final RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
     final RelDataTypeFactory.FieldInfoBuilder fieldInfo = typeFactory.builder();
     Map<String, LukeResponse.FieldInfo> luceneFieldInfoMap = getFieldInfo(collection);
+
     for(Map.Entry<String, LukeResponse.FieldInfo> entry : luceneFieldInfoMap.entrySet()) {
       LukeResponse.FieldInfo luceneFieldInfo = entry.getValue();
 
@@ -98,13 +111,17 @@ class SolrSchema extends AbstractSchema {
           type = typeFactory.createJavaType(String.class);
       }
 
-      EnumSet<FieldFlag> flags = luceneFieldInfo.getFlags();
+      EnumSet<FieldFlag> flags = luceneFieldInfo.parseFlags(luceneFieldInfo.getSchema());
+      /*
       if(flags != null && flags.contains(FieldFlag.MULTI_VALUED)) {
         type = typeFactory.createArrayType(type, -1);
       }
+      */
 
       fieldInfo.add(entry.getKey(), type).nullable(true);
     }
+    fieldInfo.add("_query_",typeFactory.createJavaType(String.class));
+    fieldInfo.add("score",typeFactory.createJavaType(Double.class));
 
     return RelDataTypeImpl.proto(fieldInfo.build());
   }
