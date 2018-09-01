@@ -13,7 +13,7 @@
 
         <solr.version>7.0.0-SNAPSHOT</solr.version>
 
-        <calcite.version>1.11.0</calcite.version>
+        <calcite.version>1.17.0</calcite.version>
         <avatica.version>1.9.0</avatica.version>
         <avatica-core.version>${avatica.version}</avatica-core.version>
 
