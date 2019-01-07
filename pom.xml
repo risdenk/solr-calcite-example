@@ -15,7 +15,7 @@
 
         <calcite.version>1.11.0</calcite.version>
         <avatica.version>1.9.0</avatica.version>
-        <avatica-core.version>${avatica.version}</avatica-core.version>
+        <avatica-core.version>1.13.0</avatica-core.version>
 
         <jetty.version>9.3.8.v20160314</jetty.version>
         <jetty-security.version>${jetty.version}</jetty-security.version>
