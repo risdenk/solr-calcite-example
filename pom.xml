@@ -19,7 +19,7 @@
 
         <jetty.version>9.3.8.v20160314</jetty.version>
         <jetty-security.version>${jetty.version}</jetty-security.version>
-        <jetty-server.version>${jetty.version}</jetty-server.version>
+        <jetty-server.version>9.4.14.v20181114</jetty-server.version>
         <jetty-util.version>${jetty.version}</jetty-util.version>
 
         <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
